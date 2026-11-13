@@ -1,0 +1,62 @@
+# Study 1: memory architecture and the disposition effect, on exogenous price paths.
+# Changing anything under `llm`, `personas` or `market`, or changing `seed`, alters the
+# prompts, so the next run makes new (paid) API calls. Analysis and plotting are free to redo.
+
+study: study1
+seed: 20261113            # controls the market paths only (scenario k uses seed + k)
+# Prompt design. v1 = first pilot (rules ended "You have no other information about the
+# companies or the market"; no price history): agents held ~98% of the time. v2 = neutral
+# monthly review without that sentence + recent prices for every arm (market.price_history).
+# Outputs go to study1_<design>* (v1 keeps the plain study1* names), all sharing one cache.
+design: v2
+
+llm:
+  backend: openai         # openai | dummy (rule-based agents, no API, for testing)
+  model: gpt-6-luna
+  service_tier: flex      # half price, slower
+  reasoning_effort: low
+  max_output_tokens: 800  # includes reasoning tokens
+  max_incomplete_retries: 5  # incomplete replies (cap hit) are retried, never parsed or held;
+                             # after this many in a row on one request the run stops
+  json_mode: true         # text.format = json_object; replies are still validated
+  timeout_s: 900          # Flex requests can queue for minutes
+  replicate_id: null      # set to an int to force fresh draws (adds a line to the prompt)
+  # USD per 1M tokens for the tier in use. Cached input defaults to the full input price
+  # (conservative) until the actual cached rate is confirmed.
+  price_per_mtok: {input: 0.05, cached_input: 0.05, output: 0.25}
+
+budget:
+  cap_usd: 4.00           # hard stop for the whole study (pilot + full, cumulative)
+
+agents:
+  personas: [young_active, retiree, experienced]
+  architectures: [none, log, reflect]
+  reflect_after: [5, 10]
+  json_retries: 1         # malformed reply -> retry once, then fall back to hold (logged)
+
+market:
+  n_stocks: 5
+  periods: 15             # 1 period = 1 month
+  start_price: 100.0
+  # Driftless log-price random walk: ln P(t+1) = ln P(t) + mu + sigma * Z.
+  # With mu = 0 the median price stays at start_price, so gains and losses are equally likely.
+  mu: 0.0                 # drift of monthly log returns
+  sigma: 0.10             # standard deviation of monthly log returns
+  # The prompt shows a "gain/loss vs average cost" column (and "% vs your average cost" on
+  # sales in the log history). false = ablation without them (run-study1 --no-pnl writes to
+  # study1_nopnl*); the default keeps the main design's prompts and cache keys unchanged.
+  show_pnl: true
+  # Months of past prices shown per stock in every arm (market information, not memory).
+  # 0 = none (design v1). Early periods show fewer months.
+  price_history: 3
+
+portfolio:
+  initial_cash: 50000.0
+  initial_shares: 100     # of every stock, bought at the start price (period 0)
+
+stages:
+  pilot: {scenarios: 5}
+  full: {scenarios: 100}
+
+run:
+  workers: 16             # agent-runs in parallel

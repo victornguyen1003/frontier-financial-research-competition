@@ -3,14 +3,14 @@
 LLM investor agents trade 4 anonymous GBM stocks for 15 periods. We then measure
 Odean's PGR, PLR and DE = PGR − PLR.
 
-| file | role |
-|---|---|
-| `config.py` | every knob: model, temperature, effort, seed, mu/sigma, endowment, grid |
-| `market.py` | GBM paths, `(T+1, N)` prices; path *k* uses seed `seed + k` |
-| `agent.py` | `Agent(persona, memory_mode)`, `decide(state)`, JSON validation/retry, memory |
-| `llm.py` | Anthropic client + on-disk cache (`cache/<sha256 of full request>.json`) + `mock` backend |
-| `sim.py` | runs the grid, executes trades, writes `runs/<run_id>.jsonl` + `runs/summary.json` |
-| `metrics.py` | PGR / PLR / DE per run and pooled; `python metrics.py runs/x.jsonl` recomputes from a log |
+| file           | role                                                                                          |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| `config.py`  | every knob: model, temperature, effort, seed, mu/sigma, endowment, grid                       |
+| `market.py`  | GBM paths, `(T+1, N)` prices; path *k* uses seed `seed + k`                             |
+| `agent.py`   | `Agent(persona, memory_mode)`, `decide(state)`, JSON validation/retry, memory             |
+| `llm.py`     | Anthropic client + on-disk cache (`cache/<sha256 of full request>.json`) + `mock` backend |
+| `sim.py`     | runs the grid, executes trades, writes `runs/<run_id>.jsonl` + `runs/summary.json`        |
+| `metrics.py` | PGR / PLR / DE per run and pooled; `python metrics.py runs/x.jsonl` recomputes from a log   |
 
 ```bash
 pip install -r requirements.txt
@@ -22,6 +22,7 @@ python sim.py --modes none log reflect --paths 10
 Credentials: `ANTHROPIC_API_KEY` or an `ant auth login` profile.
 
 ## Design choices
+
 - **Endowment:** $5,000 cash plus 20 shares of each stock, bought at the period-0 price
   (100). This gives the agent gains and losses to realize from period 1 on.
 - **Cost basis:** the weighted-average purchase price. Sells execute before buys at the

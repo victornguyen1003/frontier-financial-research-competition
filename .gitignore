@@ -1,0 +1,21 @@
+.venv/
+
+# Secrets: the OpenAI key lives in a local .env (template: .env.example, which is committed).
+.env
+.env.*
+!.env.example
+__pycache__/
+.pytest_cache/
+*.egg-info/
+
+# The reply cache IS committed: it makes `--replay` free for every collaborator (README,
+# "Sharing the cache"). Only machine-local files inside it are ignored.
+cache/*/spend.json
+cache/**/*.tmp
+
+# Logs are regenerated for free from the committed cache with `--replay`.
+logs/
+
+# Pipeline checks and prompt previews are regenerated for free.
+results/*_dummy/
+results/*_dryrun/

@@ -1,0 +1,2 @@
+# Reply cache: generated, content-addressed JSON. Hide it from diffs and collapse it in PRs.
+cache/**/*.json -diff linguist-generated=true
