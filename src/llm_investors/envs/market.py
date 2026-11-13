@@ -1,7 +1,8 @@
 """Study 2 environment: a Smith-Suchanek-Williams (1988) asset market with a call auction.
 
-One risky stock (Stock A) + cash. Each period: agents submit one limit order each, a single
-call auction clears at the volume-maximizing price, then each share pays a random dividend.
+One risky stock (Stock A) + cash. Each period: agents submit a two-sided quote (one buy and one
+sell limit order; design v2) or one limit order (design v1), a single call auction clears at
+the volume-maximizing price, then each share pays a random dividend.
 Fundamental value at period t = E[dividend] x remaining periods (including t).
 """
 from __future__ import annotations
@@ -12,7 +13,8 @@ import random
 from dataclasses import dataclass
 
 from llm_investors.agents.agent import EnvSpec
-from llm_investors.agents.prompts import ORDER_FORMAT_STUDY2
+from llm_investors.agents.parsing import InvalidReply
+from llm_investors.agents.prompts import ORDER_FORMAT_STUDY2, QUOTE_FORMAT_STUDY2
 
 
 # --------------------------------------------------------------------------- auction
@@ -106,14 +108,22 @@ def validate(order: dict, tr: Trader) -> tuple[dict, dict | None]:
 
 
 # --------------------------------------------------------------------------- prompts
-def rules(T: int, dividends: list[float], price_limit: float | None, tax: float) -> str:
+ORDER_SENTENCE = {
+    "v1": "Every period each trader may submit one order to buy or sell at a limit price.",
+    "v2": ("Every period each trader submits two limit orders: a buy order at the highest price "
+           "they will pay and a sell order at the lowest price they will accept."),
+}
+
+
+def rules(T: int, dividends: list[float], price_limit: float | None, tax: float,
+          design: str = "v2") -> str:
     divs = ", ".join(f"{d:g}" for d in dividends[:-1]) + f" or {dividends[-1]:g}"
     ev = sum(dividends) / len(dividends)
     text = (f"You trade in a market with one stock, Stock A, and cash. The market lasts {T} "
             f"periods. At the end of every period each share pays a dividend of {divs}, each with "
             f"equal chance (average {ev:g}). After the dividend of period {T}, shares are worth "
-            f"nothing. Every period each trader may submit one order to buy or sell at a limit "
-            f"price. All orders are collected and executed in a single auction at the one price "
+            f"nothing. {ORDER_SENTENCE[design]} "
+            f"All orders are collected and executed in a single auction at the one price "
             f"that lets the most shares trade; when more shares are offered than wanted at that "
             f"price (or the other way round), orders are filled in proportion to their size. "
             f"You cannot sell more shares than you own or spend more cash than you have. "
@@ -126,10 +136,29 @@ def rules(T: int, dividends: list[float], price_limit: float | None, tax: float)
     return text
 
 
-def env_spec(T: int, dividends, price_limit, tax) -> EnvSpec:
-    return EnvSpec(rules=rules(T, dividends, price_limit, tax), labels=["A"],
-                   order_format=ORDER_FORMAT_STUDY2.format(), one_order=True,
-                   require_limit=True)
+def env_spec(T: int, dividends, price_limit, tax, design: str = "v2") -> EnvSpec:
+    if design == "v1":
+        return EnvSpec(rules=rules(T, dividends, price_limit, tax, "v1"), labels=["A"],
+                       order_format=ORDER_FORMAT_STUDY2.format(), one_order=True,
+                       require_limit=True)
+    return EnvSpec(rules=rules(T, dividends, price_limit, tax, "v2"), labels=["A"],
+                   order_format=QUOTE_FORMAT_STUDY2, one_order=True, require_limit=True,
+                   two_sided=True)
+
+
+def quote_check(tr: "Trader"):
+    """Account-dependent rule for a two-sided quote: each side needs quantity >= 1 unless it
+    is infeasible (sell with no shares; buy when cash cannot pay one share at the buy limit).
+    A quote is not a commitment to trade (an agent can price a side far from the market), but a
+    side with quantity 0 would let the market go one-sided again, as in design v1."""
+    def check(orders: list[dict]):
+        buy, sell = orders
+        if sell["quantity"] == 0 and tr.shares > 0:
+            raise InvalidReply(f"sell quantity must be at least 1: you own {tr.shares} shares")
+        if buy["quantity"] == 0 and tr.cash >= buy["limit_price"]:
+            raise InvalidReply(f"buy quantity must be at least 1: your cash ({tr.cash:,.2f}) "
+                               f"pays for at least one share at your buy limit_price")
+    return check
 
 
 def state_block(t: int, T: int, tr: Trader, history: list[dict], ev: float,
@@ -151,7 +180,8 @@ def state_block(t: int, T: int, tr: Trader, history: list[dict], ev: float,
 
 
 # --------------------------------------------------------------------------- dummy agent
-def dummy_policy(agent_id: str, t: int, tr: Trader, fv: float, last_price: float):
+def dummy_policy(agent_id: str, t: int, tr: Trader, fv: float, last_price: float,
+                 two_sided: bool = True):
     calls = {"n": 0}
 
     def reply() -> str:
@@ -160,6 +190,16 @@ def dummy_policy(agent_id: str, t: int, tr: Trader, fv: float, last_price: float
         if calls["n"] == 1 and rng.random() < 0.05:
             return "I think I will buy some shares."          # not JSON on purpose
         belief = fv * rng.uniform(0.8, 1.25)
+        if two_sided:
+            bid = round(belief * rng.uniform(0.85, 0.98), 2)
+            ask = round(max(belief * rng.uniform(1.02, 1.15), bid + 0.01), 2)
+            bq = rng.randint(1, 2) if tr.cash >= bid else 0
+            sq = rng.randint(1, min(2, tr.shares)) if tr.shares else 0
+            return json.dumps({"orders": [
+                {"stock": "A", "action": "buy", "quantity": bq, "limit_price": bid,
+                 "reason": "rule"},
+                {"stock": "A", "action": "sell", "quantity": sq, "limit_price": ask,
+                 "reason": "rule"}]})
         if belief > last_price * 1.02 and tr.cash > belief:
             o = {"action": "buy", "quantity": rng.randint(1, 2), "limit_price": round(belief, 2)}
         elif belief < last_price * 0.98 and tr.shares:

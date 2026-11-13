@@ -8,7 +8,7 @@ from llm_investors.llm.client import CacheMiss, FatalAPIError, IncompleteLimit
 
 from . import prompts
 from .memory import Memory
-from .parsing import InvalidReply, hold, parse_lessons, parse_orders
+from .parsing import InvalidReply, hold, parse_lessons, parse_orders, parse_quotes
 from .personas import persona_text
 
 
@@ -19,6 +19,7 @@ class EnvSpec:
     order_format: str
     one_order: bool = False
     require_limit: bool = False
+    two_sided: bool = False          # Study 2 design v2: one buy + one sell order per period
 
 
 @dataclass
@@ -89,13 +90,19 @@ class Agent:
                                    {"role": "user", "content": prompts.correction_message(err)}]
         return None, err
 
-    def decide(self, period: int, state_block: str, dummy=None) -> list[dict]:
-        """Return one order per stock label. Falls back to hold (logged) if every reply is invalid."""
+    def decide(self, period: int, state_block: str, dummy=None, check=None) -> list[dict]:
+        """Return one order per stock label (two-sided: [buy, sell]). `check(orders)` may raise
+        InvalidReply for account-dependent rules; it triggers the same correction retry.
+        Falls back to hold (logged) if every reply is invalid."""
         user = prompts.decision_user_prompt(self.memory.block(), state_block)
-        parsed, err = self._ask(
-            "decision", period, self.system, user,
-            lambda t: parse_orders(t, self.env.labels, self.env.one_order, self.env.require_limit),
-            dummy)
+
+        def parser(t):
+            out = (parse_quotes(t, self.env.labels[0]) if self.env.two_sided else
+                   parse_orders(t, self.env.labels, self.env.one_order, self.env.require_limit))
+            if check:
+                check(out)
+            return out
+        parsed, err = self._ask("decision", period, self.system, user, parser, dummy)
         if parsed is None:
             self.n_fallback += 1
             self.log("fallback", agent=self.agent_id, kind="decision", period=period,

@@ -1,3 +1,4 @@
+import numpy as np
 from llm_investors.envs.market import Trader, clear_call_auction, validate
 
 
@@ -67,3 +68,20 @@ def test_validate_clips_to_cash_and_shares():
     assert o["quantity"] == 2 and rej["executed"] == 2
     o, rej = validate({"action": "sell", "quantity": 3, "limit_price": 100}, tr)
     assert o["quantity"] == 1 and rej["requested"] == 3
+
+
+def test_bubble_measures_ignore_no_trade_periods():
+    from llm_investors.measure.market_metrics import bubble_measures, trading_measures
+    fv = [240, 216, 192, 168]
+    # design v1 pilot: one trade at 240 in period 1, then a frozen carried-forward price
+    frozen = bubble_measures([240] * 4, fv, [True, False, False, False])
+    assert frozen["traded_periods"] == 1 and frozen["no_trade_share"] == 0.75
+    assert frozen["RD"] == 0.0 and frozen["peak_period"] == 1        # not a bubble
+    assert bubble_measures([240] * 4, fv)["RD"] > 0.1                 # what v1 metrics reported
+    none = bubble_measures([240] * 4, fv, [False] * 4)
+    assert none["traded_periods"] == 0 and np.isnan(none["RAD"]) and none["peak_period"] is None
+    part = bubble_measures([240, 240, 150, 150], fv, [True, False, True, False])
+    assert part["peak_period"] == 1 and abs(part["crash"] - (1 - 150 / 240)) < 1e-12
+    # returns skip the carried-forward prices: 240 -> 150 -> 120 is two returns, not three
+    t = trading_measures([240, 240, 150, 120], [3, 0, 2, 1], 38, [True, False, True, True])
+    assert t["volume_total"] == 6 and t["volatility"] is None        # < 3 returns

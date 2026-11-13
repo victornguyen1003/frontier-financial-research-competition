@@ -252,3 +252,53 @@ def test_price_history_is_shown_in_every_arm_and_memory_differs(tmp_path, monkey
     assert "Your record of previous periods" in p6["log"]
     assert "Lessons you wrote" in p6["reflect"]
     assert "Your record" not in p6["none"] and "Lessons" not in p6["none"]
+
+
+def _study2_events(tmp_path, monkeypatch, design, **cell):
+    cfg = load_config("study2")
+    cfg["llm"]["backend"] = "dummy"
+    cfg["design"] = design
+    monkeypatch.setattr(run_study2, "ROOT", tmp_path)
+    params = run_study2.cell_params(cfg, {"n_agents": 12, "periods": 8, **cell})
+    r = run_study2.run_market(cfg, FakeLLM(), design, "c", params, 0, threading.Event(),
+                              NullBoard(), 4)
+    assert r["status"] == "complete"
+    return [json.loads(l) for l in (tmp_path / "logs" / design / "run_c_r00.jsonl")
+            .read_text().splitlines()]
+
+
+def test_study2_v2_two_sided_quotes_reach_the_auction(tmp_path, monkeypatch):
+    ev = _study2_events(tmp_path, monkeypatch, "v2")
+    assert ev[0]["two_sided"] and ev[0]["design"] == "v2"
+    ends = [e for e in ev if e["type"] == "period_end"]
+    for e in ends:
+        for a, os in e["orders"].items():
+            sides = [o["action"] for o in os]
+            assert sides in (["buy", "sell"], ["hold"]), sides          # [hold] = fallback
+            if sides == ["buy", "sell"]:
+                assert os[0]["limit_price"] < os[1]["limit_price"]
+    auctions = [e for e in ev if e["type"] == "auction_cleared"]
+    assert all(a["n_buy"] > 0 and a["n_sell"] > 0 for a in auctions)  # both sides every period
+    assert sum(a["traded"] for a in auctions) >= len(auctions) // 2
+    # nobody buys and sells in the same period
+    by = {}
+    for e in ev:
+        if e["type"] == "trade":
+            by.setdefault((e["agent"], e["period"]), set()).add(e["side"])
+    assert all(len(v) == 1 for v in by.values())
+    system = next(e["system"] for e in ev if e["type"] == "llm_call")
+    assert "two limit orders" in system and "exactly two entries" in system
+
+
+def test_study2_v1_still_runs_one_order(tmp_path, monkeypatch):
+    ev = _study2_events(tmp_path, monkeypatch, "v1")
+    ends = [e for e in ev if e["type"] == "period_end"]
+    assert all(len(os) == 1 for e in ends for os in e["orders"].values())
+    system = next(e["system"] for e in ev if e["type"] == "llm_call")
+    assert "may submit one order" in system
+
+
+def test_study2_output_names_by_design():
+    from llm_investors.sim.common import output_name
+    assert output_name("study2", "openai", False, "pilot", "v2") == "study2_v2_pilot"
+    assert output_name("study2", "openai", False, "pilot", "") == "study2_pilot"

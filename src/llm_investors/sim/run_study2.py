@@ -65,13 +65,16 @@ def run_market(cfg, llm, name, cell_name, P, rep, stop: threading.Event, board: 
     dividends = [rng.choice(divs) for _ in range(T)]
     traders = {f"t{i:02d}": M.Trader(float(c), int(s), fv1, 0) for i, (c, s) in enumerate(endow)}
     ids = list(traders)
-    spec = M.env_spec(T, divs, P["price_limit"], P["transaction_tax"])
+    design = cfg.get("design", "v1")
+    two_sided = design != "v1"
+    spec = M.env_spec(T, divs, P["price_limit"], P["transaction_tax"], design)
     dummy = cfg["llm"]["backend"] == "dummy" or llm.dry_run
     log = EventLog(ROOT / "logs" / name / f"run_{run_id}.jsonl")
     total_shares = sum(tr.shares for tr in traders.values())
     log("run_start", run_id=run_id, study="study2", cell=cell_name, replicate=rep,
         agent_mix=P["agent_mix"], memory=P["memory"], architecture=P["memory"],
         price_limit=P["price_limit"], transaction_tax=P["transaction_tax"], n_agents=n,
+        design=design, two_sided=two_sided,
         periods=T, dividends_drawn=dividends, total_shares=total_shares,
         agents=[{"agent": a, "persona": p, "cash": traders[a].cash, "shares": traders[a].shares}
                 for a, p in zip(ids, personas)],
@@ -95,24 +98,34 @@ def run_market(cfg, llm, name, cell_name, P, rep, stop: threading.Event, board: 
 
             def decide(a):
                 tr = traders[a]
-                reply, _ = M.dummy_policy(f"{rep}/{a}", t, tr, fv, last_price) if dummy else (None, None)
+                reply, _ = (M.dummy_policy(f"{rep}/{a}", t, tr, fv, last_price, two_sided)
+                            if dummy else (None, None))
                 return agents[a].decide(t, M.state_block(t, T, tr, history, ev_div, last_price),
-                                        dummy=reply)[0]
+                                        dummy=reply,
+                                        check=M.quote_check(tr) if two_sided else None)
+            # orders[a] is a list: [buy, sell] (design v2), [one order] (v1) or [hold] (fallback)
             orders = dict(zip(ids, pool.map(decide, ids)))
 
             before = {a: (tr.shares, tr.avg_cost, tr.opened) for a, tr in traders.items()}
             cash0 = sum(tr.cash for tr in traders.values())
             buys, sells = [], []
             for a in ids:
-                o, rej = M.validate(orders[a], traders[a])
-                if rej:
-                    log("order_rejected", agent=a, period=t, **rej)
-                orders[a] = o
-                if o["action"] in ("buy", "sell") and o["quantity"] > 0:
-                    (buys if o["action"] == "buy" else sells).append(
-                        {"id": a, "quantity": o["quantity"], "limit_price": o["limit_price"]})
+                checked = []
+                for o in orders[a]:
+                    o, rej = M.validate(o, traders[a])
+                    if rej:
+                        log("order_rejected", agent=a, period=t, **rej)
+                    checked.append(o)
+                    if o["action"] in ("buy", "sell") and o["quantity"] > 0:
+                        (buys if o["action"] == "buy" else sells).append(
+                            {"id": a, "quantity": o["quantity"], "limit_price": o["limit_price"]})
+                orders[a] = checked
             res = M.clear_call_auction(buys, sells, last_price, P["price_limit"],
                                        m.get("min_imbalance_tiebreak", True))
+            # buy limit < sell limit, so no agent can be on both sides of one clearing price
+            assert not ({b["id"] for b in buys if b["limit_price"] >= res["price"] - 1e-9}
+                        & {o["id"] for o in sells if o["limit_price"] <= res["price"] + 1e-9}) \
+                or not res["traded"]
             p, tax_paid, trades = res["price"], 0.0, {a: [] for a in ids}
             for a, q in res["fills"].items():
                 tr = traders[a]
@@ -174,13 +187,15 @@ def run_market(cfg, llm, name, cell_name, P, rep, stop: threading.Event, board: 
                                          "prev_value": prev_value[a], "trades": trades[a],
                                          "dividend_per_share": d,
                                          "dividend_total": d * traders[a].shares}, T,
-                                     dummy_lessons=M.dummy_policy(f"{rep}/{a}", t, traders[a], fv, p)[1]
+                                     dummy_lessons=M.dummy_policy(f"{rep}/{a}", t, traders[a], fv, p,
+                                                                  two_sided)[1]
                                      if dummy else None)
             list(pool.map(end, ids))
             prev_value = values
-            sample = next((o for o in orders.values() if o["action"] != "hold"), orders[ids[0]])
-            nb = sum(o["action"] == "buy" for o in orders.values())
-            ns = sum(o["action"] == "sell" for o in orders.values())
+            flat = [o for os in orders.values() for o in os]
+            sample = next((o for o in flat if o["action"] != "hold"), flat[0])
+            nb = sum(o["action"] == "buy" and o["quantity"] > 0 for o in flat)
+            ns = sum(o["action"] == "sell" and o["quantity"] > 0 for o in flat)
             board.update(run_id, period=f"{t}/{T}", price=f"{last_price:.1f}", FV=f"{fv:.0f}",
                          volume=res["volume"], orders=f"{nb} buy / {ns} sell",
                          reason=f"{sample['action']}: {sample['reason'][:70]}")
@@ -227,8 +242,11 @@ def main():
     if args.backend:
         cfg["llm"]["backend"] = args.backend
     backend = cfg["llm"]["backend"]
-    name = output_name("study2", backend, args.dry_run, args.stage)
-    proj_file = ROOT / "results" / output_name("study2", backend, False, "pilot") \
+    # Design v1 (one order per period) keeps the plain study2* names; v2 -> study2_v2*.
+    design = cfg.get("design", "v1")
+    variant = "" if design == "v1" else design
+    name = output_name("study2", backend, args.dry_run, args.stage, variant)
+    proj_file = ROOT / "results" / output_name("study2", backend, False, "pilot", variant) \
         / "pilot_projection.json"
     log_name = replay_setup(args, backend, name)
     if backend == "openai" and not (args.dry_run or args.replay):
@@ -272,8 +290,8 @@ def main():
         dataset._save(df, out, k)
     mk = dfs.get("markets")
     if mk is not None and not mk.empty:
-        cols = ["run_id", "status", "RAD", "RD", "peak_overpricing", "turnover", "volatility",
-                "DE", "incomplete"]
+        cols = ["run_id", "status", "traded_periods", "no_trade_share", "RAD", "RD",
+                "peak_overpricing", "turnover", "volatility", "DE", "incomplete"]
         # reindex: markets stopped before their first auction have no outcome columns
         print("\n" + mk.reindex(columns=cols).round(3).to_string(index=False))
         by_cell = mk.groupby("cell")[["llm_calls", "incomplete", "incomplete_stops",

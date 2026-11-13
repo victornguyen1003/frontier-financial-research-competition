@@ -100,6 +100,7 @@ def build(study: str) -> dict[str, pd.DataFrame]:
             if T:
                 price = [a["price"] for a in auctions]
                 fv = [a["fundamental_value"] for a in auctions]
+                traded = [a["traded"] for a in auctions]
                 for a in auctions:
                     mper_rows.append({**meta, "period": a["period"], "price": a["price"],
                                       "fv": a["fundamental_value"], "volume": a["volume"],
@@ -108,10 +109,10 @@ def build(study: str) -> dict[str, pd.DataFrame]:
                 market_rows.append({**meta, "complete": complete,
                                     "status": end.get("status") if end else "crashed",
                                     "periods": T, **obsv,
-                                    **market_metrics.bubble_measures(price, fv),
+                                    **market_metrics.bubble_measures(price, fv, traded),
                                     **market_metrics.trading_measures(
                                         price, [a["volume"] for a in auctions],
-                                        start["total_shares"]),
+                                        start["total_shares"], traded),
                                     **odean.disposition(obs, False)})
             else:  # stopped before the first auction: keep the row for observability counts
                 market_rows.append({**meta, "complete": complete,

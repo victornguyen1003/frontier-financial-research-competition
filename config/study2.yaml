@@ -3,6 +3,12 @@
 
 study: study2
 seed: 20261114            # dividend draws, endowment assignment, dummy agents
+# Order design. v1 = first pilot: one buy/sell/hold order per agent per period. Every agent
+# offered to sell from period 2 on and nobody bid, so the price froze at 240 while FV fell to
+# 24. v2 = a two-sided quote every period (one buy and one sell limit order, buy limit < sell
+# limit; a side may have quantity 0 only when it is infeasible). Outputs go to study2_<design>*
+# (v1 keeps the plain study2* names), all sharing one cache.
+design: v2
 
 llm:
   backend: openai

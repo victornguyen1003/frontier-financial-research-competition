@@ -136,11 +136,16 @@ elif page == "Assumptions":
 - **Agents:** {b['n_agents']} per market, equal wealth {m['wealth']:,} at FV₁ with
   {m['endowment_shares']} shares (cash = wealth − shares × FV₁); endowed shares are booked at
   FV₁ as their purchase price.
+- **Orders (design {C.get('design', 'v1')}):** {"every agent submits a two-sided quote each "
+  "period: a buy order (highest price it will pay) and a sell order (lowest price it will "
+  "accept, above its buy price); a side may have quantity 0 only when it is infeasible"
+  if C.get('design', 'v1') != 'v1' else "one buy, sell or hold order per agent per period"}.
 - **Call auction:** maximize volume; ties broken by
   {"smallest order imbalance (default; departs from the proposal, see README), then "
    if m.get('min_imbalance_tiebreak', True) else ""}closest to the previous price, then
   the lower price; pro-rata fills on the long side. If nothing crosses, the previous price is
-  carried forward (shown as "no trade").
+  carried forward (shown as "no trade"). Bubble measures (RAD, RD, peak, crash) and returns
+  use traded periods only; the share of no-trade periods is reported next to them.
 - **Treatments** vary across market runs, never within one; replicate *r* uses the same
   dividend draws and endowments in every cell (common random numbers).
 - **DE inside the market** uses all periods with a position (one stock, so sale days have no
@@ -249,14 +254,18 @@ elif page == "Live view":
             st.line_chart(prices.iloc[: t + 1], height=220, x_label="period", y_label="price")
         else:
             auc = [e for e in ev if e["type"] == "auction_cleared"][:t]
-            st.line_chart(pd.DataFrame({"price": [a["price"] for a in auc],
+            # no-trade periods are gaps: the carried-forward price is not a market price
+            st.line_chart(pd.DataFrame({"clearing price": [a["price"] if a["traded"] else None
+                                                           for a in auc],
                                         "fundamental value": [a["fundamental_value"] for a in auc]},
                                        index=range(1, len(auc) + 1)), height=220,
                           x_label="period")
         st.subheader(f"Decisions in period {t}")
         orders = pe["orders"]
+        # Study 1: list; Study 2: {agent: order} (design v1) or {agent: [buy, sell]} (v2)
         od = (pd.DataFrame(orders) if isinstance(orders, list)
-              else pd.DataFrame([{"agent": a, **o} for a, o in orders.items()]))
+              else pd.DataFrame([{"agent": a, **o} for a, os in orders.items()
+                                 for o in (os if isinstance(os, list) else [os])]))
         st.dataframe(od, hide_index=True, width="stretch")
         st.subheader("Prompt and raw-response inspector")
         calls = [e for e in ev if e["type"] == "llm_call" and e["period"] == t]

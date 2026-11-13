@@ -4,7 +4,7 @@ import re
 import pytest
 
 from llm_investors.agents import prompts
-from llm_investors.agents.parsing import InvalidReply, parse_lessons, parse_orders
+from llm_investors.agents.parsing import InvalidReply, parse_lessons, parse_orders, parse_quotes
 from llm_investors.agents.personas import PERSONAS
 from llm_investors.envs import exogenous as X
 from llm_investors.envs import market as M
@@ -14,17 +14,21 @@ def all_prompt_texts():
     texts = list(PERSONAS.values()) + [prompts.ORDER_FORMAT_STUDY1, prompts.ORDER_FORMAT_STUDY2,
                                        prompts.REFLECT_FORMAT, X.RULES, X.RULES_V1,
                                        M.rules(15, [0, 8, 28, 60], 0.1, 0.003),
+                                       M.rules(15, [0, 8, 28, 60], None, 0, "v1"),
+                                       prompts.QUOTE_FORMAT_STUDY2,
                                        prompts.reflect_user_prompt(["Period 1: ..."], ["x"]),
                                        prompts.correction_message("e")]
     for p in PERSONAS.values():
         texts.append(prompts.system_prompt(X.RULES, p, X.env_spec(5).order_format))
-        sp = M.env_spec(15, [0, 8, 28, 60], 0.1, 0.003)
-        texts.append(prompts.system_prompt(sp.rules, p, sp.order_format))
+        for design in ("v1", "v2"):
+            sp = M.env_spec(15, [0, 8, 28, 60], 0.1, 0.003, design)
+            texts.append(prompts.system_prompt(sp.rules, p, sp.order_format))
     return texts
 
 
 def test_rendered_formats_have_single_braces():
-    for f in (X.env_spec(5).order_format, M.env_spec(15, [0, 8], None, 0).order_format):
+    for f in (X.env_spec(5).order_format, M.env_spec(15, [0, 8], None, 0).order_format,
+              M.env_spec(15, [0, 8], None, 0, "v1").order_format):
         assert "{{" not in f and "}}" not in f and '{"orders":' in f
 
 
@@ -124,3 +128,46 @@ def test_v2_rules_drop_the_passivity_cue():
     assert "no other information" not in X.rules("v2")
     assert "prices in recent months" in X.rules("v2")
     assert X.env_spec(5, "v1").rules == X.RULES_V1 and X.env_spec(5).rules == X.RULES_V2
+
+
+Q = ('{"orders":[{"stock":"A","action":"buy","quantity":%s,"limit_price":%s,"reason":"r"},'
+     '{"stock":"A","action":"sell","quantity":%s,"limit_price":%s,"reason":"r"}]}')
+
+
+def test_parse_quotes_two_sided():
+    b, s = parse_quotes(Q % (2, 150, 1, 210))
+    assert (b["action"], b["quantity"], b["limit_price"]) == ("buy", 2, 150.0)
+    assert (s["action"], s["quantity"], s["limit_price"]) == ("sell", 1, 210.0)
+    # order of entries does not matter
+    rev = '{"orders":[{"action":"sell","quantity":1,"limit_price":9},{"action":"buy","quantity":0,"limit_price":5}]}'
+    assert [o["action"] for o in parse_quotes(rev)] == ["buy", "sell"]
+    with pytest.raises(InvalidReply, match="higher than the buy"):
+        parse_quotes(Q % (1, 200, 1, 200))                      # would trade with itself
+    with pytest.raises(InvalidReply, match="exactly two"):
+        parse_quotes('{"orders":[{"action":"sell","quantity":1,"limit_price":9}]}')
+    with pytest.raises(InvalidReply, match="two buy orders"):
+        parse_quotes(Q.replace('"sell"', '"buy"') % (1, 5, 1, 9))
+    with pytest.raises(InvalidReply, match="positive number"):
+        parse_quotes(Q % (1, "null", 1, 9))
+    with pytest.raises(InvalidReply, match="buy or sell"):
+        parse_quotes(Q.replace('"sell"', '"hold"') % (1, 5, 0, 9))
+
+
+def test_quote_check_requires_both_sides_when_feasible():
+    tr = M.Trader(cash=500.0, shares=3, avg_cost=240.0)
+    check = M.quote_check(tr)
+    check(parse_quotes(Q % (1, 100, 1, 300)))                      # fine
+    with pytest.raises(InvalidReply, match="sell quantity must be at least 1"):
+        check(parse_quotes(Q % (1, 100, 0, 300)))
+    with pytest.raises(InvalidReply, match="buy quantity must be at least 1"):
+        check(parse_quotes(Q % (0, 100, 1, 300)))
+    # infeasible sides may be 0: no shares to sell; cash below the buy limit
+    M.quote_check(M.Trader(cash=50.0, shares=0, avg_cost=0.0))(parse_quotes(Q % (0, 100, 0, 300)))
+
+
+def test_v2_rules_ask_for_two_orders():
+    v1, v2 = M.rules(15, [0, 8, 28, 60], None, 0, "v1"), M.rules(15, [0, 8, 28, 60], None, 0)
+    assert "may submit one order to buy or sell" in v1
+    assert "submits two limit orders: a buy order" in v2 and "one order" not in v2
+    assert M.env_spec(15, [0, 8], None, 0).two_sided
+    assert not M.env_spec(15, [0, 8], None, 0, "v1").two_sided

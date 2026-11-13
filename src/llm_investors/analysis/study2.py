@@ -26,7 +26,7 @@ from llm_investors.measure import market_metrics, odean
 from llm_investors.measure.dataset import read_log
 
 from llm_investors.paths import ROOT  # noqa: E402
-OUTCOMES = ["RAD", "RD", "peak_overpricing", "crash", "turnover", "volatility",
+OUTCOMES = ["no_trade_share", "RAD", "RD", "peak_overpricing", "crash", "turnover", "volatility",
             "ret_autocorr_1"]
 
 
@@ -93,7 +93,8 @@ def agent_de(runs: pd.DataFrame, study1: str) -> pd.DataFrame:
 def stylized_facts(mp: pd.DataFrame) -> dict:
     r = []
     acs = []
-    for _, g in mp.sort_values("period").groupby("run_id"):
+    # returns between consecutive traded prices (a carried-forward price is not a new price)
+    for _, g in mp[mp["traded"].astype(bool)].sort_values("period").groupby("run_id"):
         x = np.diff(np.log(g["price"].to_numpy()))
         r += list(x)
         a = market_metrics._ac(np.abs(x))
@@ -117,9 +118,11 @@ def fig_price_fv(mp: pd.DataFrame, path: Path):
     for ax, cell in zip(axes.flat, cells):
         g = mp[mp["cell"] == cell]
         for i, (_, r) in enumerate(g.groupby("run_id")):
-            r = r.sort_values("period")
+            r = r[r["traded"].astype(bool)].sort_values("period")   # no-trade periods: no price
             ax.plot(r["period"], r["price"], color=style.SERIES[0], alpha=0.55, linewidth=1.5,
-                    label="price (one line per market run)" if i == 0 else None)
+                    marker="o", markersize=3,
+                    label="clearing price, traded periods only (one line per run)"
+                    if i == 0 else None)
         fv = g.drop_duplicates("period").sort_values("period")
         ax.plot(fv["period"], fv["fv"], color=style.INK, linestyle="--", linewidth=1.5,
                 label="fundamental value")
@@ -166,11 +169,17 @@ def fig_outcomes(mk: pd.DataFrame, path: Path):
 
 
 def action_matrix(log_path: Path) -> tuple[np.ndarray, list[str]]:
-    """Agents x periods: +1 buy, -1 sell, 0 hold (orders after validation)."""
-    ev = [e for e in read_log(log_path) if e["type"] == "period_end"]
-    agents = sorted(ev[0]["orders"]) if ev else []
-    code = {"buy": 1, "sell": -1, "hold": 0}
-    m = np.array([[code[e["orders"][a]["action"]] for e in ev] for a in agents])
+    """Agents x periods: +1 bought, -1 sold, 0 no trade (executed trades, not orders: with
+    two-sided quotes every agent submits both a buy and a sell order every period)."""
+    ev = read_log(log_path)
+    T = sum(e["type"] == "period_end" for e in ev)
+    start = next((e for e in ev if e["type"] == "run_start"), None)
+    agents = sorted(a["agent"] for a in start["agents"]) if start and T else []
+    ix = {a: i for i, a in enumerate(agents)}
+    m = np.zeros((len(agents), T), int)
+    for e in ev:
+        if e["type"] == "trade" and e["agent"] in ix and e["period"] <= T:
+            m[ix[e["agent"]], e["period"] - 1] = 1 if e["side"] == "buy" else -1
     return m, agents
 
 
@@ -194,10 +203,12 @@ def fig_actions(log_path: Path, path: Path):
     ax.set_xlabel("period")
     ax.grid(False)
     from matplotlib.patches import Patch
-    ax.legend(handles=[Patch(color=style.BUY, label="buy"), Patch(color=style.SELL, label="sell"),
-                       Patch(facecolor=style.NEUTRAL, edgecolor=style.GRID, label="hold")],
+    ax.legend(handles=[Patch(color=style.BUY, label="bought"),
+                       Patch(color=style.SELL, label="sold"),
+                       Patch(facecolor=style.NEUTRAL, edgecolor=style.GRID, label="no trade")],
               loc="upper center", bbox_to_anchor=(0.5, -0.08 - 3 / (len(agents) + 8)), ncols=3)
-    ax.set_title(f"Orders by agent and period — {start['run_id'].replace('_', ' ')}", loc="left")
+    ax.set_title(f"Executed trades by agent and period — {start['run_id'].replace('_', ' ')}",
+                 loc="left")
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)

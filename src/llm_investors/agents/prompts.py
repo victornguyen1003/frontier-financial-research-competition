@@ -16,6 +16,18 @@ ORDER_FORMAT_STUDY2 = """Reply with ONLY a compact JSON object, no other text:
 Give exactly one entry. For buy or sell, limit_price is the highest price you will pay \
 (buy) or the lowest price you will accept (sell). For hold, use quantity 0 and limit_price null."""
 
+# Study 2 design v2: a two-sided quote every period (a buy and a sell order), so the auction
+# always has both sides of the market. Design v1 (one order, ORDER_FORMAT_STUDY2) let every
+# agent offer to sell with nobody bidding, and the price froze.
+QUOTE_FORMAT_STUDY2 = """Reply with ONLY a compact JSON object, no other text:
+{"orders":[{"stock":"A","action":"buy","quantity":<int>,"limit_price":<number>,"reason":"<one short sentence>"},{"stock":"A","action":"sell","quantity":<int>,"limit_price":<number>,"reason":"<one short sentence>"}]}
+Give exactly two entries: one buy and one sell. The buy limit_price is the highest price you \
+will pay; the sell limit_price is the lowest price you will accept and must be higher than \
+your buy limit_price. Each quantity must be at least 1, except: use sell quantity 0 if you own \
+no shares, and buy quantity 0 if your cash cannot pay for one share at your buy limit_price. \
+An order executes only if the auction price is at or below your buy limit or at or above your \
+sell limit."""
+
 REFLECT_FORMAT = """Reply with ONLY a compact JSON object, no other text:
 {"lessons":["<lesson 1>","<lesson 2>","<lesson 3>"]}"""
 

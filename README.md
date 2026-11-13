@@ -39,8 +39,8 @@ study's cap (US$4 / US$6), but the dashboard limit is the last line of defense.
 | 3    | `run-study1 --stage full`                         | asks for confirmation against the pilot projection; replays the pilot's calls from cache                                                                      |
 |      | `build-dataset study1 && analyze-study1`          | regressions, bootstrap CIs, figures                                                                                                                           |
 | 4    | `run-study2 --backend dummy --stage full`         | auction and conservation asserts hold every period                                                                                                            |
-| 5    | `run-study2 --stage pilot`, then `--stage full` | 10 agents × 10 periods, then 20 market runs. Read the pilot's price paths first: showing FV every period may keep prices at FV (no bubble)                   |
-|      | `build-dataset study2 && analyze-study2`          | outcomes by treatment, figures                                                                                                                                |
+| 5    | `run-study2 --stage pilot`, then `--stage full` | 10 agents × 10 periods (`logs/study2_v2_pilot/`), then 20 market runs. Check the pilot's `no_trade_share` and price path first (see "Study 2 order design") |
+|      | `build-dataset study2_v2 && analyze-study2 study2_v2` | outcomes by treatment, figures (the name is `study2_<design>`; design v1 is plain `study2`)                                                            |
 
 Useful flags: `--no-live` turns off the live terminal table, `--workers N` sets parallelism,
 `--yes` skips the confirmation, `--scenarios N` overrides the Study 1 stage size, and
@@ -283,6 +283,68 @@ The min-imbalance rule is the default (`market.min_imbalance_tiebreak: true` in
 `config/study2.yaml`). Set it to `false` for the proposal's literal rule.
 `tests/test_auction.py` covers both rules.
 
+## Study 2 order design (v2: two-sided quotes)
+
+**Why it changed.** In the first real pilot (design v1, `logs/study2_pilot/`, $0.011), each
+agent sent one buy, sell or hold order per period. From period 2 on, 9–10 of 10 agents offered
+to sell and none bid, nearly all saying the price was above the expected remaining dividends.
+Nothing crossed, so the price carried forward at 240 for 9 periods while FV fell from 216 to
+24. The old metrics read that frozen price as a bubble (RD = 0.82, peak overpricing 1.64),
+and the in-market DE was empty because the price never left anyone's cost basis. The agents
+agree with each other (same model, FV stated on screen), so one-sided order flow is the
+expected outcome, and the auction can't discover a price without both sides.
+
+**What v2 does.** Every period each agent submits a two-sided quote: one buy order (the highest
+price it will pay) and one sell order (the lowest price it will accept). The auction rule
+itself is unchanged.
+
+**Assumptions made in v2** (not fixed by the proposal):
+
+- **Buy limit < sell limit, strictly.** Then an agent can never be on both sides of one
+  clearing price, so it never trades with itself (asserted every period).
+- **Quantity ≥ 1 on each side unless that side is infeasible.** A sell of 0 is allowed only
+  with no shares; a buy of 0 only when cash can't pay for one share at the buy limit. Without
+  this rule a side could be left empty and the market could go one-sided again, as in v1.
+- **A quote is not a commitment to trade.** No maximum spread is imposed: an agent that doesn't
+  want to trade can price a side far from the market. No-trade periods are therefore still
+  possible, and they are measured, not hidden (see below). The order format says so in one
+  neutral sentence ("An order executes only if the auction price is at or below your buy limit
+  or at or above your sell limit").
+- **Invalid quotes** (wrong count of entries, two buys, buy limit ≥ sell limit, a missing price,
+  quantity 0 on a feasible side) get the usual single retry with a correction that names the
+  problem, then a logged fallback with no orders that period. Same policy as Study 1.
+- **Feasibility clipping is per order and unchanged:** a buy is clipped to cash ÷ buy limit, a
+  sell to shares held. Both sides can't fill in one auction, so this period's sale proceeds
+  never need to fund this period's purchase.
+- **Unchanged from v1:** the FV line ("Expected value of the remaining dividends …") is still
+  shown every period, as the proposal specifies; market history still lists the
+  carried-forward price marked "(no trade)"; the period-1 reference price is FV₁; price
+  limit and tax rules are the same.
+- **Executed trades, not orders,** are what the per-run heatmap (`actions_heatmap_*.png`)
+  shows, since every agent now quotes both sides every period.
+- **Reproducibility.** `design: v2` in `config/study2.yaml` writes to `study2_v2*`;
+  `design: v1` still builds byte-identical v1 prompts (checked against all 100 logged pilot
+  prompts), so the v1 pilot replays for free from the shared cache.
+
+**Price measures use traded periods only.** In a no-trade period the logged price is the
+previous price carried forward, which nobody paid, so it is not evidence of mispricing.
+
+- RAD, RD, peak overpricing and crash are computed over traded periods; mean FV is taken over
+  the same periods, and the peak period is the actual period number.
+- Returns (volatility, autocorrelations, kurtosis, stylized facts) are log changes between
+  consecutive traded prices; a return that spans no-trade periods counts once.
+- Volume and turnover use every period (a no-trade period adds 0).
+- `traded_periods` and `no_trade_share` are reported next to the measures in `markets.csv`,
+  the run summary and the analysis tables. A market with no trade at all has NaN price
+  measures; cell means skip NaN, so always read them with `no_trade_share`.
+- The price chart in the viewer and `price_vs_fv.png` plot clearing prices at traded periods
+  only.
+- **In-market DE is unchanged:** in a no-trade period a position is still valued at the last
+  traded price, because that is the price the agent sees.
+
+These measures follow Stöckl, Huber & Kirchler (2010), whose lab markets trade every period. A
+high `no_trade_share` makes them less comparable with lab results, and should be reported.
+
 ## Implementation choices not fixed by the proposal
 
 - **Order handling.** Orders that exceed holdings or cash are clipped to the feasible
@@ -341,7 +403,8 @@ The min-imbalance rule is the default (`market.min_imbalance_tiebreak: true` in
   Study 1's all-periods DE is shown next to it only as a reference.
 - **Study 2 endowments.** Endowed shares are booked at FV₁ as their purchase price.
 - **Bubble measures.** Peak overpricing is max(P − FV) / mean FV, on the same scale as RAD
-  and RD. Crash is the maximum drawdown of the price path.
+  and RD. Crash is the maximum drawdown of the price path. All use traded periods only (see
+  "Study 2 order design").
 - **Temperature** is never sent. `json_mode` sets `text.format = json_object`; replies are
   still validated.
 
@@ -352,8 +415,10 @@ The min-imbalance rule is the default (`market.min_imbalance_tiebreak: true` in
 - **Incomplete rate.** Check the pilot's incomplete counts per condition before the full run.
   If they're high, raise `max_output_tokens` or lower the effort. Retries cost money, and an
   uneven rate across memory modes would be worth reporting.
-- **Prices on screen in Study 2.** FV is shown every period, as the proposal specifies. This may
-  keep prices at FV (a null result). Check the pilot's price paths before the 20-market run.
+- **Prices on screen in Study 2.** FV is shown every period, as the proposal specifies, and was
+  kept in design v2 (decision by Victor). This is a strong cue toward rational pricing and may
+  keep prices near FV (a null result for bubbles). Check the v2 pilot's price path and
+  `no_trade_share` before the 20-market run.
 - **Cached-input price.** It is set equal to the full input price (conservative) until the
   Flex rate for cached tokens is confirmed.
 - **Other §12 items.** Study 2 treatment priorities, and whether to add `gpt-6.1-sol` check
