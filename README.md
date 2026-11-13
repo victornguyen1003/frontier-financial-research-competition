@@ -6,8 +6,7 @@ Finance). It implements `assets/proposals/victor_proposal_2.pdf`.
 - **Study 1 (micro):** agents trade 5 anonymized stocks on exogenous price paths. Does the
   memory architecture (`none` / `log` / `reflect`) change the disposition effect (DE)?
 - **Study 2 (macro):** the same agents trade one stock with each other in a call-auction market
-  (Smith–Suchanek–Williams design). Do bubbles, volume and volatility change with persona mix,
-  memory, a ±10% price limit, or a 0.3% transaction tax?
+  (Smith–Suchanek–Williams design). Do bubbles, volume and volatility change with persona mix, memory, a ±10% price limit, or a 0.3% transaction tax?
 
 ## Setup
 
@@ -32,16 +31,16 @@ study's cap (US$4 / US$6), but the dashboard limit is the last line of defense.
 
 ## Build order and commands
 
-| Step | Command | Exit check |
-|---|---|---|
-| 1 | `run-study1 --backend dummy --stage full` | accounting and PGR/PLR tests pass (`pytest`) |
-| – | `run-study1 --dry-run` | prints prompts and an upper-bound cost; no API calls |
-| 2 | `run-study1 --stage pilot` | 5 scenarios × 3 × 3, written to `logs/study1_pilot/`. Prints measured tokens, the projected full cost and any service-tier mismatch, then **stops** |
-| 3 | `run-study1 --stage full` | asks for confirmation against the pilot projection; replays the pilot's calls from cache |
-|   | `build-dataset study1 && analyze-study1` | regressions, bootstrap CIs, figures |
-| 4 | `run-study2 --backend dummy --stage full` | auction and conservation asserts hold every period |
-| 5 | `run-study2 --stage pilot`, then `--stage full` | 10 agents × 10 periods, then 20 market runs. Read the pilot's price paths first: showing FV every period may keep prices at FV (no bubble) |
-|   | `build-dataset study2 && analyze-study2` | outcomes by treatment, figures |
+| Step | Command                                             | Exit check                                                                                                                                                    |
+| ---- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `run-study1 --backend dummy --stage full`         | accounting and PGR/PLR tests pass (`pytest`)                                                                                                                |
+| –   | `run-study1 --dry-run`                            | prints prompts and an upper-bound cost; no API calls                                                                                                          |
+| 2    | `run-study1 --stage pilot`                        | 5 scenarios × 3 × 3, written to `logs/study1_pilot/`. Prints measured tokens, the projected full cost and any service-tier mismatch, then **stops** |
+| 3    | `run-study1 --stage full`                         | asks for confirmation against the pilot projection; replays the pilot's calls from cache                                                                      |
+|      | `build-dataset study1 && analyze-study1`          | regressions, bootstrap CIs, figures                                                                                                                           |
+| 4    | `run-study2 --backend dummy --stage full`         | auction and conservation asserts hold every period                                                                                                            |
+| 5    | `run-study2 --stage pilot`, then `--stage full` | 10 agents × 10 periods, then 20 market runs. Read the pilot's price paths first: showing FV every period may keep prices at FV (no bubble)                   |
+|      | `build-dataset study2 && analyze-study2`          | outcomes by treatment, figures                                                                                                                                |
 
 Useful flags: `--no-live` turns off the live terminal table, `--workers N` sets parallelism,
 `--yes` skips the confirmation, `--scenarios N` overrides the Study 1 stage size, and
@@ -207,11 +206,11 @@ and one budget, and v1 can still be replayed with `design: v1`.
 
 Only three kinds of error are retried, with exponential backoff and no attempt limit:
 
-| Retried | Examples |
-|---|---|
-| Timeouts | client timeout, HTTP 408, 504 |
-| Rate limits | HTTP 429 that is not a quota error (`rate_limit_exceeded`) |
-| Resource unavailable | HTTP 503, or a `resource_unavailable` code or message (Flex out of capacity) |
+| Retried              | Examples                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Timeouts             | client timeout, HTTP 408, 504                                                                                |
+| Rate limits          | HTTP 429 that is not a quota error (`rate_limit_exceeded`)                                                 |
+| Resource unavailable | HTTP 503, or a `resource_unavailable` code or message (Flex out of capacity)                               |
 | Gateway / Cloudflare | 502, 520, 521, 523 (upstream unavailable) and 522, 524 (gateway timeouts). A 520 stopped the first full run. |
 
 Everything else is **fatal**. The first fatal error stops the whole study run immediately:
@@ -312,6 +311,7 @@ The min-imbalance rule is the default (`market.min_imbalance_tiebreak: true` in
 - **Study 1 inference.** SEs are clustered by matched set (persona × scenario), not by run as in
   the proposal. The three arms of a set share prices and identical early prompts, so their
   errors are correlated; matched sets nest runs, so this is the more conservative choice.
+
   - Robustness specifications: without the `ret` control (with it, gain × arch is a jump at
     zero return, not the full winner–loser gap), without the final period (agents know the
     horizon), logit (a failure is printed as FAILED and listed in `summary.json`), and
@@ -332,6 +332,7 @@ The min-imbalance rule is the default (`market.min_imbalance_tiebreak: true` in
 - **Study 2 DE.** It uses every period with a position, because a single stock gives no paper
   counterpart on sale days. It is **not comparable like for like with Study 1**, for three
   reasons:
+
   - endowed shares are booked at FV₁ = 360 while FV falls to 24, so most positions are
     structural paper losses;
   - gain/loss uses a clearing price the agent hadn't seen when it decided;
