@@ -95,6 +95,11 @@ def err_msg(cls, status, message, code=None):
                      "resource_unavailable"), "retry"),
     (lambda: err_msg(openai.InternalServerError, 503, "Service Unavailable"), "retry"),
     (lambda: err_msg(openai.InternalServerError, 504, "Gateway Timeout"), "retry"),
+    # Cloudflare / gateway errors: timeouts or upstream unavailable -> retried
+    (lambda: err_msg(openai.InternalServerError, 520, "Error code: 520"), "retry"),
+    (lambda: err_msg(openai.InternalServerError, 502, "Bad Gateway"), "retry"),
+    (lambda: err_msg(openai.InternalServerError, 522, "Connection timed out"), "retry"),
+    (lambda: err_msg(openai.InternalServerError, 524, "A timeout occurred"), "retry"),
     # everything else is fatal
     (lambda: err_msg(openai.InternalServerError, 500, "Internal error"), "api_error"),
     (lambda: err_msg(openai.BadRequestError, 400, "Unsupported parameter"), "api_error"),
@@ -337,3 +342,11 @@ def test_json_mode_without_json_in_input_stops_before_paying(tmp_path):
     with pytest.raises(C.FatalAPIError, match="needs the word 'json'"):
         cl.complete("Reply in JSON.", [{"role": "user", "content": "Write three lessons."}])
     assert cl._client.responses.calls == [] and cl.cost.spent == 0 and cl.halted.is_set()
+
+
+def test_cloudflare_520_is_retried_then_succeeds(tmp_path, monkeypatch):
+    monkeypatch.setattr(C.time, "sleep", lambda s: None)
+    cl = make(tmp_path, [err(openai.InternalServerError, 520), err(openai.InternalServerError, 524),
+                         fake_response()])
+    r = cl.complete("sys", [{"role": "user", "content": "json: x"}])
+    assert r["api_retries"] == 2 and r["text"] == '{"ok": 1}' and not cl.halted.is_set()

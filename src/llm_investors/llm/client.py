@@ -3,6 +3,9 @@
 Failure policy (proposal §3, tightened before the pilot):
 - retried with exponential backoff until success: timeouts, 429 rate limits, and "resource
   unavailable" (HTTP 503, or a resource_unavailable code/message, e.g. Flex out of capacity).
+  Gateway / Cloudflare errors count as these two kinds: 504, 522 and 524 are timeouts; 502,
+  520, 521 and 523 mean the upstream was unavailable or returned nothing (a 520 stopped the
+  first full run 13 calls after a resume, with no OpenAI request id).
 - fatal (FatalAPIError, never retried): quota / billing / spend-limit errors (kind "quota",
   e.g. insufficient_quota, even when sent as a 429) and every other API error (kind
   "api_error": bad request, auth, unknown model, other 5xx, connection drops). The caller logs
@@ -79,6 +82,10 @@ QUOTA_CODES = {"insufficient_quota", "billing_hard_limit_reached", "billing_not_
 QUOTA_WORDS = re.compile(r"quota|billing|spend(ing)? limit|budget|usage limit|credit balance",
                          re.I)
 RETRY_CODES = {"rate_limit_exceeded", "resource_unavailable"}
+# Timeouts: 408, 504, 522 (connection timed out), 524 (timeout at the gateway).
+# Resource unavailable: 503, 502 (bad gateway), 520 (empty/unknown upstream response),
+# 521 (upstream down), 523 (upstream unreachable). Rate limit: 429.
+RETRY_STATUS = {408, 429, 502, 503, 504, 520, 521, 522, 523, 524}
 UNAVAILABLE = re.compile(r"resource[ _]unavailable|resource_exhausted", re.I)
 
 
@@ -97,7 +104,7 @@ def classify_error(e: Exception) -> str:
     if isinstance(e, openai.APITimeoutError):
         return "retry"
     if isinstance(e, openai.APIStatusError):
-        if e.status_code in (408, 429, 503, 504) or UNAVAILABLE.search(text):
+        if e.status_code in RETRY_STATUS or UNAVAILABLE.search(text):
             return "retry"
     return "api_error"
 

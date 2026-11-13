@@ -212,13 +212,15 @@ Only three kinds of error are retried, with exponential backoff and no attempt l
 | Timeouts | client timeout, HTTP 408, 504 |
 | Rate limits | HTTP 429 that is not a quota error (`rate_limit_exceeded`) |
 | Resource unavailable | HTTP 503, or a `resource_unavailable` code or message (Flex out of capacity) |
+| Gateway / Cloudflare | 502, 520, 521, 523 (upstream unavailable) and 522, 524 (gateway timeouts). A 520 stopped the first full run. |
 
 Everything else is **fatal**. The first fatal error stops the whole study run immediately:
 
 - **Quota / billing / spend limit** (`insufficient_quota`, `billing_hard_limit_reached`, or a
   message about quota, billing or a spend limit). OpenAI sends an exhausted quota as HTTP 429,
   so quota is checked before rate limits.
-- **Any other API error** (bad request, auth, unknown model, HTTP 500, connection drop).
+- **Any other API error** (bad request, auth, unknown model, HTTP 500 from OpenAI itself,
+  connection drop).
 
 When that happens:
 
