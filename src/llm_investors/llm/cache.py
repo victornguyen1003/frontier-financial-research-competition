@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 from pathlib import Path
 
 
@@ -45,9 +46,22 @@ class DiskCache:
     def put(self, key: str, rec: dict):
         p = self._path(key)
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(f".{os.getpid()}.tmp")
-        tmp.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+        tmp = p.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")
+        # fsync before the rename (and the directory after it): a paid reply must survive a
+        # power loss or freeze, not come back as an empty file after the rename.
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False))
+            f.flush()
+            os.fsync(f.fileno())
         tmp.replace(p)
+        try:
+            fd = os.open(p.parent, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        except OSError:
+            pass                                    # e.g. platforms without directory fsync
 
     def entries(self):
         return self.root.glob("??/*.json")
