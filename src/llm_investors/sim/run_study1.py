@@ -188,6 +188,10 @@ def main():
         if (msg := reminder("study1")):
             print("\n" + msg)
     code = report_fatal(results, ROOT / "logs" / name)
+    if backend == "openai" and not args.replay and not args.dry_run:
+        # logs/ is git-ignored; a gzipped copy in published/ lets a deployed viewer show them
+        from llm_investors.sim.publish_logs import publish, summary_line
+        print("\n" + summary_line(publish(log_name)))
     if code:
         sys.exit(code)        # no cost projection from an interrupted pilot
     if args.stage == "pilot" and backend == "openai" and not args.replay:

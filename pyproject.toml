@@ -24,6 +24,7 @@ analyze-study1 = "llm_investors.analysis.study1:cli"
 analyze-study2 = "llm_investors.analysis.study2:cli"
 investor-viewer = "llm_investors.app.launch:main"
 cache-stats = "llm_investors.sim.cache_stats:main"
+publish-logs = "llm_investors.sim.publish_logs:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

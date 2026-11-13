@@ -13,8 +13,9 @@ __pycache__/
 cache/*/spend.json
 cache/**/*.tmp
 
-# Logs are regenerated for free from the committed cache with `--replay`.
-logs/
+# Logs are regenerated for free from the committed cache with `--replay`. Anchored to the
+# root: published/logs/ (gzipped copies for the deployed viewer, `publish-logs`) is committed.
+/logs/
 
 # Pipeline checks and prompt previews are regenerated for free.
 results/*_dummy/

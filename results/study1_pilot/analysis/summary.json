@@ -1,0 +1,400 @@
+{
+  "n_runs": 45,
+  "n_decision_rows": 75,
+  "regressions": {
+    "LPM (main)": {
+      "gain": {
+        "coef": -0.03277910958916187,
+        "se": 0.12149576639620371,
+        "p": 0.7873169609330473
+      },
+      "gain:C(architecture, Treatment(reference='none'))[T.log]": {
+        "coef": 0.2103930150635821,
+        "se": 0.10474668290326143,
+        "p": 0.04458075910802077
+      },
+      "gain:C(architecture, Treatment(reference='none'))[T.reflect]": {
+        "coef": -0.17976506235257006,
+        "se": 0.14300474950345027,
+        "p": 0.2087331457262106
+      },
+      "ret": {
+        "coef": 0.3699937452475859,
+        "se": 0.08575544322922292,
+        "p": 1.5994861583010492e-05
+      },
+      "holding_period": {
+        "coef": 0.03271491348556277,
+        "se": 0.021539173857059286,
+        "p": 0.12879862906234346
+      },
+      "drawdown": {
+        "coef": -8.969951747669688,
+        "se": 3.8571927318652124,
+        "p": 0.02004454690116556
+      }
+    },
+    "LPM without ret": {
+      "gain": {
+        "coef": 0.1833162607639907,
+        "se": 0.16457417937379507,
+        "p": 0.2653296959122893
+      },
+      "gain:C(architecture, Treatment(reference='none'))[T.log]": {
+        "coef": 0.23686372111621956,
+        "se": 0.12849738627592805,
+        "p": 0.06528012353167359
+      },
+      "gain:C(architecture, Treatment(reference='none'))[T.reflect]": {
+        "coef": -0.16144864756870847,
+        "se": 0.17383712180782998,
+        "p": 0.3530263532893363
+      },
+      "holding_period": {
+        "coef": 0.033748898897276836,
+        "se": 0.020782956023291357,
+        "p": 0.10440273373738067
+      },
+      "drawdown": {
+        "coef": -9.618477244119001,
+        "se": 3.6921523729921355,
+        "p": 0.009184373874254508
+      }
+    },
+    "LPM excluding the final period (15)": {
+      "gain": {
+        "coef": -0.05787879176871247,
+        "se": 0.14040609387200206,
+        "p": 0.6801750903718302
+      },
+      "gain:C(architecture, Treatment(reference='none'))[T.log]": {
+        "coef": 0.306383718222298,
+        "se": 0.08809534741358074,
+        "p": 0.0005054245615701375
+      },
+      "gain:C(architecture, Treatment(reference='none'))[T.reflect]": {
+        "coef": -0.1719756178395394,
+        "se": 0.12696404598172387,
+        "p": 0.17556983830256478
+      },
+      "ret": {
+        "coef": 0.41945903195284084,
+        "se": 0.07661458287199256,
+        "p": 4.3769898802045977e-08
+      },
+      "holding_period": {
+        "coef": 0.043041989182777976,
+        "se": 0.0536270932683757,
+        "p": 0.42219643626946457
+      },
+      "drawdown": {
+        "coef": -6.821983420838964,
+        "se": 4.967520523136429,
+        "p": 0.16965362985248822
+      }
+    },
+    "LPM reflect vs none, periods 6+": {
+      "gain": {
+        "coef": 0.16468971311244732,
+        "se": 0.18110018118151375,
+        "p": 0.36314715579751145
+      },
+      "gain:C(architecture, Treatment(reference='none'))[T.reflect]": {
+        "coef": -0.16224797385452827,
+        "se": 0.14908135193635744,
+        "p": 0.2764545838649206
+      },
+      "ret": {
+        "coef": 0.02456523023876621,
+        "se": 0.03942345673890789,
+        "p": 0.5332109034998656
+      },
+      "holding_period": {
+        "coef": 0.028308448169423656,
+        "se": 0.03102040356002135,
+        "p": 0.3614660501728947
+      },
+      "drawdown": {
+        "coef": -9.02117283320357,
+        "se": 12.886151220236234,
+        "p": 0.4838852886052256
+      }
+    },
+    "LPM reflect vs none, post-reflection interaction": {
+      "gain": {
+        "coef": 0.08234485655621641,
+        "se": 0.09496973621418889,
+        "p": 0.38590684493297445
+      },
+      "gain:reflect": {
+        "coef": -0.08112398692726502,
+        "se": 0.07817892050401085,
+        "p": 0.29942332026981844
+      },
+      "gain:post": {
+        "coef": 0.08234485655621351,
+        "se": 0.09496973621418675,
+        "p": 0.38590684493298055
+      },
+      "gain:reflect:post": {
+        "coef": -0.08112398692726164,
+        "se": 0.07817892050400758,
+        "p": 0.29942332026981844
+      },
+      "ret": {
+        "coef": 0.024565230238790342,
+        "se": 0.041347670253223286,
+        "p": 0.5524358600489965
+      },
+      "holding_period": {
+        "coef": 0.02830844816942238,
+        "se": 0.032534473727557606,
+        "p": 0.38424235523751893
+      },
+      "drawdown": {
+        "coef": -9.021172833203556,
+        "se": 13.515109418641865,
+        "p": 0.5044604968831654
+      }
+    },
+    "_failed": [
+      {
+        "model": "Logit (robustness)",
+        "error": "LinAlgError: Singular matrix"
+      }
+    ]
+  },
+  "friedman": null,
+  "bootstrap": [],
+  "pooled": [
+    {
+      "sample": "all periods",
+      "persona": "all",
+      "architecture": "none",
+      "n_sets": 5,
+      "RG": 10,
+      "RL": 16,
+      "PG": 0,
+      "PL": 4,
+      "PGR": 1.0,
+      "PGR_lo": 1.0,
+      "PGR_hi": 1.0,
+      "PLR": 0.8,
+      "PLR_lo": 0.52,
+      "PLR_hi": 1.0,
+      "DE": 0.19999999999999996,
+      "DE_lo": 0.0,
+      "DE_hi": 0.48
+    },
+    {
+      "sample": "all periods",
+      "persona": "all",
+      "architecture": "log",
+      "n_sets": 5,
+      "RG": 4,
+      "RL": 4,
+      "PG": 3,
+      "PL": 9,
+      "PGR": 0.5714285714285714,
+      "PGR_lo": 0.3333333333333333,
+      "PGR_hi": 1.0,
+      "PLR": 0.3076923076923077,
+      "PLR_lo": 0.0,
+      "PLR_hi": 1.0,
+      "DE": 0.2637362637362637,
+      "DE_lo": -0.20000000000000007,
+      "DE_hi": 0.6666666666666666
+    },
+    {
+      "sample": "all periods",
+      "persona": "all",
+      "architecture": "reflect",
+      "n_sets": 5,
+      "RG": 10,
+      "RL": 15,
+      "PG": 0,
+      "PL": 0,
+      "PGR": 1.0,
+      "PGR_lo": 1.0,
+      "PGR_hi": 1.0,
+      "PLR": 1.0,
+      "PLR_lo": 1.0,
+      "PLR_hi": 1.0,
+      "DE": 0.0,
+      "DE_lo": 0.0,
+      "DE_hi": 0.0
+    },
+    {
+      "sample": "all periods",
+      "persona": "retiree",
+      "architecture": "none",
+      "n_sets": 5,
+      "RG": 10,
+      "RL": 16,
+      "PG": 0,
+      "PL": 4,
+      "PGR": 1.0,
+      "PGR_lo": 1.0,
+      "PGR_hi": 1.0,
+      "PLR": 0.8,
+      "PLR_lo": 0.5294117647058824,
+      "PLR_hi": 1.0,
+      "DE": 0.19999999999999996,
+      "DE_lo": 0.0,
+      "DE_hi": 0.47058823529411764
+    },
+    {
+      "sample": "all periods",
+      "persona": "retiree",
+      "architecture": "log",
+      "n_sets": 5,
+      "RG": 4,
+      "RL": 4,
+      "PG": 3,
+      "PL": 9,
+      "PGR": 0.5714285714285714,
+      "PGR_lo": 0.3333333333333333,
+      "PGR_hi": 1.0,
+      "PLR": 0.3076923076923077,
+      "PLR_lo": 0.0,
+      "PLR_hi": 1.0,
+      "DE": 0.2637362637362637,
+      "DE_lo": -0.20000000000000007,
+      "DE_hi": 0.6666666666666666
+    },
+    {
+      "sample": "all periods",
+      "persona": "retiree",
+      "architecture": "reflect",
+      "n_sets": 5,
+      "RG": 10,
+      "RL": 15,
+      "PG": 0,
+      "PL": 0,
+      "PGR": 1.0,
+      "PGR_lo": 1.0,
+      "PGR_hi": 1.0,
+      "PLR": 1.0,
+      "PLR_lo": 1.0,
+      "PLR_hi": 1.0,
+      "DE": 0.0,
+      "DE_lo": 0.0,
+      "DE_hi": 0.0
+    },
+    {
+      "sample": "excluding period 15",
+      "persona": "all",
+      "architecture": "none",
+      "n_sets": 5,
+      "RG": 9,
+      "RL": 12,
+      "PG": 0,
+      "PL": 4,
+      "PGR": 1.0,
+      "PGR_lo": 1.0,
+      "PGR_hi": 1.0,
+      "PLR": 0.75,
+      "PLR_lo": 0.42857142857142855,
+      "PLR_hi": 1.0,
+      "DE": 0.25,
+      "DE_lo": 0.0,
+      "DE_hi": 0.5714285714285714
+    },
+    {
+      "sample": "excluding period 15",
+      "persona": "all",
+      "architecture": "log",
+      "n_sets": 5,
+      "RG": 3,
+      "RL": 0,
+      "PG": 3,
+      "PL": 9,
+      "PGR": 0.5,
+      "PGR_lo": 0.3333333333333333,
+      "PGR_hi": 0.6666666666666666,
+      "PLR": 0.0,
+      "PLR_lo": 0.0,
+      "PLR_hi": 0.0,
+      "DE": 0.5,
+      "DE_lo": 0.3333333333333333,
+      "DE_hi": 0.6666666666666666
+    },
+    {
+      "sample": "excluding period 15",
+      "persona": "all",
+      "architecture": "reflect",
+      "n_sets": 5,
+      "RG": 7,
+      "RL": 13,
+      "PG": 0,
+      "PL": 0,
+      "PGR": 1.0,
+      "PGR_lo": 1.0,
+      "PGR_hi": 1.0,
+      "PLR": 1.0,
+      "PLR_lo": 1.0,
+      "PLR_hi": 1.0,
+      "DE": 0.0,
+      "DE_lo": 0.0,
+      "DE_hi": 0.0
+    },
+    {
+      "sample": "excluding period 15",
+      "persona": "retiree",
+      "architecture": "none",
+      "n_sets": 5,
+      "RG": 9,
+      "RL": 12,
+      "PG": 0,
+      "PL": 4,
+      "PGR": 1.0,
+      "PGR_lo": 1.0,
+      "PGR_hi": 1.0,
+      "PLR": 0.75,
+      "PLR_lo": 0.42857142857142855,
+      "PLR_hi": 1.0,
+      "DE": 0.25,
+      "DE_lo": 0.0,
+      "DE_hi": 0.5714285714285714
+    },
+    {
+      "sample": "excluding period 15",
+      "persona": "retiree",
+      "architecture": "log",
+      "n_sets": 5,
+      "RG": 3,
+      "RL": 0,
+      "PG": 3,
+      "PL": 9,
+      "PGR": 0.5,
+      "PGR_lo": 0.3333333333333333,
+      "PGR_hi": 0.6666666666666666,
+      "PLR": 0.0,
+      "PLR_lo": 0.0,
+      "PLR_hi": 0.0,
+      "DE": 0.5,
+      "DE_lo": 0.3333333333333333,
+      "DE_hi": 0.6666666666666666
+    },
+    {
+      "sample": "excluding period 15",
+      "persona": "retiree",
+      "architecture": "reflect",
+      "n_sets": 5,
+      "RG": 7,
+      "RL": 13,
+      "PG": 0,
+      "PL": 0,
+      "PGR": 1.0,
+      "PGR_lo": 1.0,
+      "PGR_hi": 1.0,
+      "PLR": 1.0,
+      "PLR_lo": 1.0,
+      "PLR_hi": 1.0,
+      "DE": 0.0,
+      "DE_lo": 0.0,
+      "DE_hi": 0.0
+    }
+  ],
+  "differences": []
+}

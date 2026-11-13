@@ -1,9 +1,13 @@
 """Viewer only: reads logs/ and results/; never runs simulations or calls the API.
 
+logs/ is git-ignored, so a deployed copy (a fresh git checkout, e.g. Streamlit Community
+Cloud) reads the gzipped copies in published/logs/ instead (`publish-logs`).
+
     streamlit run src/llm_investors/app/streamlit_app.py
 """
 from __future__ import annotations
 
+import gzip
 import json
 import sys
 from pathlib import Path
@@ -19,10 +23,24 @@ from llm_investors.paths import ROOT  # noqa: E402
 st.set_page_config(page_title="LLM investor agents", layout="wide")
 
 
+def show_table(df: pd.DataFrame | None):
+    """A rounded table, or a note when the analysis produced nothing (e.g. DE undefined)."""
+    if df is None or df.empty:
+        st.caption("Not available for this dataset (empty table, e.g. DE undefined in every run).")
+    else:
+        st.dataframe(df.round(3), hide_index=True)
+
+
+def cfg(study: str) -> dict:
+    return yaml.safe_load((ROOT / "config" / f"{study}.yaml").read_text())
+
+
 # --------------------------------------------------------------------------- data access
 def read_log(path: Path) -> list[dict]:
     out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    text = (gzip.decompress(path.read_bytes()).decode("utf-8") if path.suffix == ".gz"
+            else path.read_text(encoding="utf-8"))
+    for line in text.splitlines():
         try:
             out.append(json.loads(line))
         except json.JSONDecodeError:
@@ -39,19 +57,55 @@ def log_events(path: Path) -> list[dict]:
     return cached_log(str(path), path.stat().st_mtime)
 
 
+PUBLISHED = ROOT / "published" / "logs"
+
+
+def log_dir(name: str) -> tuple[Path, bool]:
+    """(directory, published?): local logs/<name>/ when it has runs, else the published copy."""
+    local = ROOT / "logs" / name
+    if any(local.glob("run_*.jsonl")) or not (PUBLISHED / name).is_dir():
+        return local, False
+    return PUBLISHED / name, True
+
+
+def log_files(name: str) -> list[Path]:
+    d, pub = log_dir(name)
+    return sorted(d.glob("run_*.jsonl.gz" if pub else "run_*.jsonl"))
+
+
+def run_label(p: Path) -> str:
+    return p.name.split(".")[0].removeprefix("run_")
+
+
+def main_dataset(study: str) -> str:
+    design = cfg(study).get("design", "v1")
+    return study if design == "v1" else f"{study}_{design}"
+
+
 def datasets(study: str) -> list[str]:
-    names = [p.name for p in (ROOT / "logs").glob(f"{study}*") if p.is_dir()]
-    names += [p.name for p in (ROOT / "results").glob(f"{study}*") if p.is_dir()]
-    return sorted(set(names), key=lambda n: (n != study, n)) or [study]
+    """Main design's full run first, then its pilot, then other datasets with an analysis,
+    then the rest; dummy / dry-run datasets last."""
+    names = {p.name for base in (ROOT / "logs", PUBLISHED, ROOT / "results")
+             for p in base.glob(f"{study}*") if p.is_dir()}
+    main = main_dataset(study)
+
+    def rank(n):
+        check = n.endswith("_dummy") or n.endswith("_dryrun")
+        return (check, n != main, n != f"{main}_pilot",
+                not (ROOT / "results" / n / "analysis").is_dir(), n)
+    return sorted(names, key=rank) or [main]
 
 
 def csv(name: str, file: str) -> pd.DataFrame | None:
     p = ROOT / "results" / name / file
-    return pd.read_csv(p) if p.exists() else None
+    if not p.exists():
+        return None
+    try:
+        return pd.read_csv(p)
+    except pd.errors.EmptyDataError:     # e.g. paired_vs_baseline.csv of a pilot (no baseline)
+        return None
 
 
-def cfg(study: str) -> dict:
-    return yaml.safe_load((ROOT / "config" / f"{study}.yaml").read_text())
 
 
 # --------------------------------------------------------------------------- sidebar
@@ -161,7 +215,7 @@ and are pipeline checks, not findings.
 
 elif page == "Observability":
     st.title("Observability")
-    fatal_file = ROOT / "logs" / name / "FATAL_ERROR.json"
+    fatal_file = log_dir(name)[0] / "FATAL_ERROR.json"
     if fatal_file.exists():
         f = json.loads(fatal_file.read_text())
         e = f["error"]
@@ -169,9 +223,12 @@ elif page == "Observability":
                  f"{e['error_type']} (HTTP {e['status']}, code {e['code']}): {e['message']}  \n"
                  f"{f['runs_complete']} runs complete, {len(f['runs_stopped_by_error'])} stopped "
                  f"by the error, {f['runs_aborted']} aborted. Request id: {e['request_id']}")
-    logs = sorted((ROOT / "logs" / name).glob("run_*.jsonl"))
+    logs = log_files(name)
+    if log_dir(name)[1]:
+        st.caption(f"Published copy of the logs (published/logs/{name}/).")
     if not logs:
-        st.info(f"No logs in logs/{name}/ yet.")
+        st.info(f"No logs for {name}: not in logs/{name}/ or published/logs/{name}/. "
+                f"Run `publish-logs {name}` where the logs exist, then commit published/.")
     else:
         counts, rows = {}, []
         bar = st.progress(0.0, text="reading logs")
@@ -222,13 +279,19 @@ elif page == "Observability":
 
 elif page == "Live view":
     st.title("Live view")
-    logs = sorted((ROOT / "logs" / name).glob("run_*.jsonl"), key=lambda p: p.stat().st_mtime)
+    published = log_dir(name)[1]
+    logs = log_files(name)
+    if not published:   # local: newest last (follow a running study)
+        logs = sorted(logs, key=lambda p: p.stat().st_mtime)
     if not logs:
-        st.info(f"No logs in logs/{name}/ yet. Start a run: run-{study}")
+        st.info(f"No logs for {name}: not in logs/{name}/ or published/logs/{name}/. "
+                f"Start a run: run-{study}")
         st.stop()
-    follow = st.toggle("Follow the most recently updated run", value=True)
+    follow = (not published) and st.toggle("Follow the most recently updated run", value=True)
+    if published:
+        st.caption(f"Published copy of a finished run (published/logs/{name}/).")
     choice = logs[-1] if follow else st.selectbox(
-        "Run", logs[::-1], format_func=lambda p: p.stem.removeprefix("run_"))
+        "Run", logs[::-1] if not published else logs, format_func=run_label)
 
     @st.fragment(run_every=2 if follow else None)
     def live(path: Path):
@@ -300,8 +363,10 @@ elif page == "Findings":
                    "and is not a research finding.")
     an = ROOT / "results" / name / "analysis"
     if not an.exists():
-        st.info(f"No analysis yet. Run: build-dataset {name} && "
-                f"analyze-{study} {name}")
+        have = [n for n in datasets(study) if (ROOT / "results" / n / "analysis").is_dir()]
+        st.info(f"No analysis for {name} yet. Run: build-dataset {name} && "
+                f"analyze-{study} {name}, then commit results/{name}/."
+                + (f" Datasets with an analysis: {', '.join(have)}." if have else ""))
         st.stop()
     figs = an / "figures"
     if study == "study1":
@@ -317,9 +382,9 @@ elif page == "Findings":
         st.subheader("Run-level DE by architecture × persona")
         st.caption("mean_run_DE averages runs over matched sets where DE is defined in every "
                    "arm; n_sets_dropped counts sets excluded for that reason.")
-        st.dataframe(boot.round(3), hide_index=True)
+        show_table(boot)
         st.subheader("Memory contrasts (matched sets, 95% cluster-bootstrap CI)")
-        st.dataframe(csv(name, "analysis/de_differences.csv").round(3), hide_index=True)
+        show_table(csv(name, "analysis/de_differences.csv"))
         fr = json.loads((an / "friedman.json").read_text())
         if fr:
             st.caption(f"Friedman test across architectures: χ² = {fr['statistic']:.2f}, "
@@ -335,7 +400,7 @@ elif page == "Findings":
                 st.image(str(figs / f))
         st.subheader("Outcomes by treatment (descriptive)")
         st.caption("3–5 market runs per cell: mean, sd, min and max, no confidence intervals.")
-        st.dataframe(csv(name, "analysis/outcomes_by_cell.csv").round(3), hide_index=True)
+        show_table(csv(name, "analysis/outcomes_by_cell.csv"))
         paired = csv(name, "analysis/paired_vs_baseline.csv")
         if paired is not None and not paired.empty:
             st.subheader("Paired differences vs baseline (same replicate)")
@@ -351,6 +416,6 @@ elif page == "Findings":
         st.subheader("Disposition effect inside the market")
         summ = json.loads((an / "summary.json").read_text())
         st.warning(summ.get("agent_de_note", "Not comparable like for like with Study 1."))
-        st.dataframe(csv(name, "analysis/agent_de.csv").round(3), hide_index=True)
+        show_table(csv(name, "analysis/agent_de.csv"))
         st.subheader("Stylized facts")
         st.json(json.loads((an / "stylized_facts.json").read_text()))

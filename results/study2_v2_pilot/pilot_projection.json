@@ -1,0 +1,15 @@
+{
+  "calls": 100,
+  "mean_input_tokens": 777.48,
+  "mean_output_tokens": 383.58,
+  "mean_reasoning_tokens": 298.52,
+  "mean_cost_usd": 0.000134769,
+  "json_retry_rate": 0.0,
+  "service_tiers": {
+    "flex": 100
+  },
+  "projected_full_calls": 9180,
+  "projected_full_cost_usd": 1.23717942,
+  "projected_remaining_cost_usd": 1.23717942,
+  "cap_usd": 6.0
+}

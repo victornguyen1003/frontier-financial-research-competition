@@ -1,0 +1,11 @@
+run_id,cell,replicate,agent_mix,memory,architecture,price_limit,transaction_tax,n_agents,agent,agent_persona,complete,RG,RL,PG,PL,PGR,PLR,DE
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t00,young_active,True,0,1,0,6,,0.14285714285714285,
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t01,retiree,True,0,1,0,5,,0.16666666666666666,
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t02,retiree,True,0,1,0,6,,0.14285714285714285,
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t03,young_active,True,0,1,0,6,,0.14285714285714285,
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t04,experienced,True,0,0,0,7,,0.0,
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t05,experienced,True,0,1,0,6,,0.14285714285714285,
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t06,retiree,True,0,1,0,5,,0.16666666666666666,
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t07,experienced,True,0,0,0,7,,0.0,
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t08,young_active,True,0,1,0,6,,0.14285714285714285,
+pilot_r00,pilot,0,balanced,log,log,,0.0,10,t09,young_active,True,0,1,0,6,,0.14285714285714285,

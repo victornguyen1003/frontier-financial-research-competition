@@ -256,6 +256,23 @@ like malformed JSON:
   `results/<study>/runs.csv` (Study 1) and `markets.csv` (Study 2), the summary printed after
   each run, and the Observability page.
 
+## Deploying the viewer (Streamlit Community Cloud)
+
+A deployed viewer serves a fresh git checkout, and `logs/` is git-ignored, so it needs:
+
+- **Logs:** gzipped copies in `published/logs/<dataset>/run_*.jsonl.gz` (~12x smaller). Paid
+  runs write them automatically when they finish; for older runs use `publish-logs` (all real
+  datasets) or `publish-logs <dataset>`. Publishing is deterministic, so unchanged logs give no
+  git diff. The viewer reads `logs/` when it exists locally and the published copy otherwise.
+- **Analysis:** `build-dataset <dataset> && analyze-study1|2 <dataset>`, then commit
+  `results/<dataset>/` (dummy and dry-run results stay ignored).
+- **Commit and push** `published/` and `results/`, then reboot the app if it doesn't pick up
+  the change.
+
+App settings: main file `src/llm_investors/app/streamlit_app.py`, dependencies from
+`requirements.txt`. The viewer never calls the API and needs no key. It opens on the main
+design's full run (`study1_v2`, `study2_v2`) or, before that exists, its pilot.
+
 ## Call auction rule (Study 2)
 
 Every period, all limit orders go into one call auction:
