@@ -31,16 +31,16 @@ study's cap (US$4 / US$6), but the dashboard limit is the last line of defense.
 
 ## Build order and commands
 
-| Step | Command                                             | Exit check                                                                                                                                                    |
-| ---- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | `run-study1 --backend dummy --stage full`         | accounting and PGR/PLR tests pass (`pytest`)                                                                                                                |
-| –   | `run-study1 --dry-run`                            | prints prompts and an upper-bound cost; no API calls                                                                                                          |
-| 2    | `run-study1 --stage pilot`                        | 5 scenarios × 3 × 3, written to `logs/study1_pilot/`. Prints measured tokens, the projected full cost and any service-tier mismatch, then **stops** |
-| 3    | `run-study1 --stage full`                         | asks for confirmation against the pilot projection; replays the pilot's calls from cache                                                                      |
-|      | `build-dataset study1 && analyze-study1`          | regressions, bootstrap CIs, figures                                                                                                                           |
-| 4    | `run-study2 --backend dummy --stage full`         | auction and conservation asserts hold every period                                                                                                            |
-| 5    | `run-study2 --stage pilot`, then `--stage full` | 10 agents × 10 periods (`logs/study2_v2_pilot/`), then 20 market runs. Check the pilot's `no_trade_share` and price path first (see "Study 2 order design") |
-|      | `build-dataset study2_v2 && analyze-study2 study2_v2` | outcomes by treatment, figures (the name is `study2_<design>`; design v1 is plain `study2`)                                                            |
+| Step | Command                                                 | Exit check                                                                                                                                                       |
+| ---- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `run-study1 --backend dummy --stage full`             | accounting and PGR/PLR tests pass (`pytest`)                                                                                                                   |
+| –   | `run-study1 --dry-run`                                | prints prompts and an upper-bound cost; no API calls                                                                                                             |
+| 2    | `run-study1 --stage pilot`                            | 5 scenarios × 3 × 3, written to `logs/study1_pilot/`. Prints measured tokens, the projected full cost and any service-tier mismatch, then **stops**    |
+| 3    | `run-study1 --stage full`                             | asks for confirmation against the pilot projection; replays the pilot's calls from cache                                                                         |
+|      | `build-dataset study1 && analyze-study1`              | regressions, bootstrap CIs, figures                                                                                                                              |
+| 4    | `run-study2 --backend dummy --stage full`             | auction and conservation asserts hold every period                                                                                                               |
+| 5    | `run-study2 --stage pilot`, then `--stage full`     | 10 agents × 10 periods (`logs/study2_v2_pilot/`), then 20 market runs. Check the pilot's `no_trade_share` and price path first (see "Study 2 order design") |
+|      | `build-dataset study2_v2 && analyze-study2 study2_v2` | outcomes by treatment, figures (the name is `study2_<design>`; design v1 is plain `study2`)                                                                  |
 
 Useful flags: `--no-live` turns off the live terminal table, `--workers N` sets parallelism,
 `--yes` skips the confirmation, `--scenarios N` overrides the Study 1 stage size, and
