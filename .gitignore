@@ -20,3 +20,6 @@ cache/**/*.tmp
 # Pipeline checks and prompt previews are regenerated for free.
 results/*_dummy/
 results/*_dryrun/
+
+# Papers, proposals and notes stay local (copyrighted PDFs, working drafts).
+/assets/
