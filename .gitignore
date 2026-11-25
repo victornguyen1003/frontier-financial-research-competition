@@ -35,3 +35,6 @@ results/*_dryrun/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Papers, proposals and notes stay local (copyrighted PDFs, working drafts).
+/assets/
