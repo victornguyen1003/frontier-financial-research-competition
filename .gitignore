@@ -21,5 +21,3 @@ cache/**/*.tmp
 results/*_dummy/
 results/*_dryrun/
 
-# Papers, proposals and notes stay local (copyrighted PDFs, working drafts).
-/assets/

@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team Catch-up Deck</title>
+<style>
+:root{
+  --bg:#e9e7e2; --slide:#fbfaf7; --ink:#1d1f24; --muted:#5d6370; --rule:#d9d5cc;
+  --accent:#1f5f8b; --accent-soft:#e3edf4; --warn:#a4501b; --warn-soft:#f6e9df;
+  --ok:#2f6b3a; --ok-soft:#e4efe5; --chip:#efece6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121417; --slide:#1b1e23; --ink:#e8e6e1; --muted:#a0a6b1; --rule:#343842;
+    --accent:#7db4dc; --accent-soft:#1f2c37; --warn:#e3a275; --warn-soft:#352419;
+    --ok:#8fc79a; --ok-soft:#1d2d21; --chip:#262a31;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121417; --slide:#1b1e23; --ink:#e8e6e1; --muted:#a0a6b1; --rule:#343842;
+  --accent:#7db4dc; --accent-soft:#1f2c37; --warn:#e3a275; --warn-soft:#352419;
+  --ok:#8fc79a; --ok-soft:#1d2d21; --chip:#262a31;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Inter","Segoe UI","Helvetica Neue",Arial,"Noto Sans TC","PingFang TC",sans-serif}
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.slide{position:absolute;width:1280px;height:720px;background:var(--slide);padding:56px 72px 48px;
+  display:none;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.18);border-radius:6px;transform-origin:center center}
+.slide.active{display:flex}
+.kicker{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:8px}
+h1{font-size:44px;line-height:1.15;margin:0 0 18px;font-weight:700}
+h2{font-size:32px;line-height:1.2;margin:0 0 22px;font-weight:700}
+h3{font-size:19px;margin:0 0 10px;font-weight:650}
+p,li{font-size:18px;line-height:1.45}
+ul{margin:0;padding-left:22px} li{margin:0 0 7px}
+.muted{color:var(--muted)}
+.small, .small li, .small td, .small th{font-size:15px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:32px;flex:1;min-height:0}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;flex:1;min-height:0}
+.card{background:var(--chip);border-radius:8px;padding:18px 20px}
+.card.accent{background:var(--accent-soft)} .card.warn{background:var(--warn-soft)} .card.ok{background:var(--ok-soft)}
+.card h3{margin-bottom:8px}
+table{border-collapse:collapse;width:100%}
+th,td{font-size:16px;text-align:left;padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.04em}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.neg{color:var(--warn);font-weight:600} .pos{color:var(--ok);font-weight:600}
+.tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.05em;padding:2px 8px;border-radius:99px;
+  background:var(--accent-soft);color:var(--accent);vertical-align:middle;margin-right:6px;text-transform:uppercase}
+.tag.warn{background:var(--warn-soft);color:var(--warn)} .tag.ok{background:var(--ok-soft);color:var(--ok)}
+.foot{margin-top:auto;padding-top:14px;font-size:13px;color:var(--muted);display:flex;justify-content:space-between;border-top:1px solid var(--rule)}
+.timeline{display:flex;gap:0;margin:8px 0 24px;position:relative}
+.timeline .ev{flex:1;position:relative;padding-top:26px;padding-right:12px}
+.timeline .ev::before{content:"";position:absolute;top:8px;left:0;right:0;height:2px;background:var(--rule)}
+.timeline .ev::after{content:"";position:absolute;top:2px;left:0;width:14px;height:14px;border-radius:50%;background:var(--accent)}
+.timeline .ev.future::after{background:var(--slide);border:2px solid var(--muted)}
+.timeline .d{font-weight:700;font-size:16px} .timeline .t{font-size:15px;color:var(--muted);line-height:1.35}
+.big{font-size:22px;line-height:1.45}
+.quote{border-left:4px solid var(--accent);padding:6px 0 6px 18px;font-size:21px;line-height:1.45;margin:4px 0 18px}
+.eq{font-family:"Cambria Math","STIX Two Math",Georgia,serif;font-size:19px;background:var(--chip);padding:10px 14px;border-radius:6px;display:inline-block}
+#hud{position:fixed;bottom:12px;right:16px;font-size:13px;color:var(--muted);user-select:none}
+#hud button{background:var(--slide);color:var(--ink);border:1px solid var(--rule);border-radius:4px;padding:4px 10px;cursor:pointer;margin-left:4px}
+@media print{
+  @page{size:1280px 720px;margin:0}
+  html,body{background:#fff}
+  #stage{position:static;display:block}
+  .slide{display:flex!important;position:relative;transform:none!important;box-shadow:none;border-radius:0;page-break-after:always;break-after:page}
+  #hud{display:none}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- 1 -->
+<section class="slide">
+  <div class="kicker">Frontier Financial Research Competition · Topic 1 (SinoPac)</div>
+  <h1>Catch-up: what the team discussed after Prototype 1</h1>
+  <p class="big muted" style="max-width:900px">Four meetings between 11 and 25 Nov 2026 turned the project from
+  “does memory change the disposition effect?” into
+  <b style="color:var(--ink)">“do the persona settings we give LLM agents really drive their disposition effect, which parameters matter, and is it stable?”</b></p>
+  <div class="grid3" style="margin-top:28px;flex:0">
+    <div class="card"><h3>Starting point</h3><p class="small">You know Barber et al. (2007), Generative Agents, and Prototype 1 (memory arms → DE).</p></div>
+    <div class="card accent"><h3>Biggest change</h3><p class="small">The project now follows <b>SinoPac's</b> priorities: persona validity, each parameter's weight, a reasoning field, and stability. The professor's draft feeds the persona parameter list.</p></div>
+    <div class="card warn"><h3>Your open to-dos</h3><p class="small">Persona redesign (now central), pilot with variable cost basis, return/dd check. The de-label to-do was <b>dropped</b> by the advisor.</p></div>
+  </div>
+  <div class="foot"><span>Sources: assets/notion (meeting notes, PM pages), Meeting 2 beamer deck, results/study1_v2</span><span>Prepared 25 Nov 2026</span></div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <div class="kicker">Timeline</div>
+  <h2>Five events so far, the upload window opens 1 Dec</h2>
+  <div class="timeline">
+    <div class="ev"><div class="d">11 Nov</div><div class="t">Meeting 1<br>Topic chosen; logit with Memory × G</div></div>
+    <div class="ev"><div class="d">14 Nov</div><div class="t">Justin's “Regression issue” review</div></div>
+    <div class="ev"><div class="d">18 Nov</div><div class="t">Meeting 2<br>Prototype results; memory, paths, G</div></div>
+    <div class="ev"><div class="d">24 Nov</div><div class="t">Advisor (Prof. 陳彥行)<br>Draft: persona prompts</div></div>
+    <div class="ev"><div class="d">25 Nov</div><div class="t">SinoPac consultation<br>Project now follows this</div></div>
+  </div>
+  <div class="timeline">
+    <div class="ev future"><div class="d">1–21 Dec</div><div class="t">Upload report: cover, body, AI-use statement (+ replication package)</div></div>
+    <div class="ev future"><div class="d">8 Dec 19:00</div><div class="t">2nd (last) advisor meeting</div></div>
+    <div class="ev future"><div class="d">12 Jan 14:00</div><div class="t">Round 1 results (5 finalist teams per topic)</div></div>
+    <div class="ev future"><div class="d">19 Jan 23:59</div><div class="t">Final slides + 多元適性評量</div></div>
+    <div class="ev future"><div class="d">22 Jan</div><div class="t">Final, in person (台灣金融研訓院)</div></div>
+  </div>
+  <p class="small muted" style="margin-top:6px">Registration and advisor sign-up are done. The organizer confirmed that AI-generated data is fine.</p>
+  <div class="foot"><span>Team: Justin (PM, stats) · Jim (econometrics, presenting) · Nina (advisor contact) · Victor (code, agent design)</span><span>2</span></div>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <div class="kicker">Meeting 1 · 11 Nov</div>
+  <h2>Three proposals merged into your design</h2>
+  <div class="grid2">
+    <div>
+      <h3>What each person pitched</h3>
+      <ul class="small">
+        <li><b>Victor:</b> vary only the memory architecture (none / observation / +reflection), à la Generative Agents.</li>
+        <li><b>Jim:</b> explain why the literature disagrees on LLM disposition effect. Blind vs. financial labels, random paths as “memory”, about 8k calls.</li>
+        <li><b>Justin:</b> replicate Barber with memory agents, compare memory frameworks, and add investor types. He proposed bootstrapping real paths against contamination.</li>
+        <li>ESG and financial-inclusion topics were rejected for lack of data.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Consensus</h3>
+      <div class="eq">P(Sold<sub>it</sub>=1) = Λ(α + β<sub>1</sub>Mem<sub>i</sub> + β<sub>2</sub>G<sub>it</sub> + β<sub>3</sub>Mem<sub>i</sub>×G<sub>it</sub> + β<sub>4</sub>dd<sub>it</sub> + γ′X)</div>
+      <ul class="small" style="margin-top:14px">
+        <li>β<sub>2</sub> &gt; 0 means a disposition effect (Q1). <b>β<sub>3</sub> is the main test</b>: does memory change the DE? (Q2)</li>
+        <li>Jim dropped his prompt experiment and adopted your setup.</li>
+        <li>The null of “is there a DE at all” is too easy. The point is the <i>difference across settings</i>.</li>
+      </ul>
+      <h3 style="margin-top:14px">Left open</h3>
+      <p class="small">What “memory” means (3 definitions), martingale vs. bootstrap paths, Min-K% contamination test, how to “value” a prompt.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Notion: 第一次會議：題目擬定會議</span><span>3</span></div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <div class="kicker">PM page · 14 Nov · Justin</div>
+  <h2>“Regression issue”: the logit must match what Barber measures</h2>
+  <div class="grid2">
+    <div>
+      <ul class="small">
+        <li><b>Barber runs no regression.</b> PGR and PLR are daily hazard rates over <i>positions still held</i>, with the average purchase price as reference.</li>
+        <li><b>Use a position-day panel</b> (agent × stock × day). Positions leave once sold, so the logit becomes a discrete-time hazard model.</li>
+        <li><b>Pick one memory definition.</b> If “memory” is the price path, it is collinear with G and dd.</li>
+        <li><b>Compare ratios and signs, not levels.</b> An LLM that decides every period sells far more often than 3–9% a day.</li>
+        <li>With an interaction term, β<sub>2</sub> is the DE for the baseline arm only. Report odds ratios or marginal effects per arm.</li>
+        <li>Barber is probably in the training data, so a result near 2× might be recall.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Benchmark: Barber et al. (2007), Table 3 Panel B</h3>
+      <table class="small">
+        <tr><th>Type</th><th class="num">PGR</th><th class="num">PLR</th><th class="num">Ratio</th><th class="num">OR</th></tr>
+        <tr><td>Individuals</td><td class="num">4.39</td><td class="num">1.67</td><td class="num">2.63</td><td class="num">2.70</td></tr>
+        <tr><td>Dealers</td><td class="num">4.54</td><td class="num">1.73</td><td class="num">2.62</td><td class="num">2.70</td></tr>
+        <tr><td>Corporations</td><td class="num">0.83</td><td class="num">0.31</td><td class="num">2.68</td><td class="num">2.69</td></tr>
+        <tr><td>Mutual funds</td><td class="num">1.32</td><td class="num">1.53</td><td class="num">0.86</td><td class="num">0.86</td></tr>
+        <tr><td>Foreigners</td><td class="num">0.46</td><td class="num">0.67</td><td class="num">0.69</td><td class="num">0.69</td></tr>
+        <tr><td>All</td><td class="num">2.93</td><td class="num">1.42</td><td class="num">2.06</td><td class="num">2.10</td></tr>
+      </table>
+      <p class="small muted" style="margin-top:10px">ln OR for individuals ≈ 0.99 is the target β<sub>2</sub>. Panel C (mean across investors) gives a ratio of 4.05 instead, so state which panel you compare against.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Notion: FFR_PM / Regression issue; Reference: Decomposition effect</span><span>4</span></div>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <div class="kicker">Meeting 2 · 18 Nov · what you reported</div>
+  <h2>The prototype found a <span class="neg">reverse</span> disposition effect, and memory moves it toward zero</h2>
+  <div class="grid2">
+    <div>
+      <p class="small muted" style="margin:0 0 8px">Study 1 v2 full run: 900 runs (3 personas × 3 arms × 100 scenarios), 5 stocks, 15 periods, σ = 10% driftless paths. DE = PGR − PLR, pooled, with 95% bootstrap CI.</p>
+      <table>
+        <tr><th>Persona</th><th class="num">none</th><th class="num">log</th><th class="num">reflect</th></tr>
+        <tr><td>All</td><td class="num neg">−0.22</td><td class="num neg">−0.15</td><td class="num neg">−0.14</td></tr>
+        <tr><td>Experienced</td><td class="num neg">−0.47</td><td class="num neg">−0.45</td><td class="num neg">−0.42</td></tr>
+        <tr><td>Retiree</td><td class="num">+0.01</td><td class="num pos">+0.08</td><td class="num">+0.06</td></tr>
+        <tr><td>Young active</td><td class="num neg">−0.20</td><td class="num">−0.05</td><td class="num pos">+0.11</td></tr>
+      </table>
+      <p class="small muted" style="margin-top:8px">Colored values have 95% CIs that exclude 0.</p>
+    </div>
+    <div>
+      <h3>How the team read it</h3>
+      <ul class="small">
+        <li>The direction is the opposite of humans. Possible causes: the model <b>guesses the experiment</b> and behaves “rationally”, or it knows the DE literature.</li>
+        <li>Memory raises DE: reflect − none = +0.16 overall and +0.35 for young_active. That supports Q2 even though the levels are negative.</li>
+        <li>Three personas is too few, and details like “age 27” have no data behind them. The team asked for <b>more personas, based on literature or statistics</b>.</li>
+        <li>Whatever the sign, it is writable: “memory is a key parameter of simulated-investor outcomes.”</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Notion: 第二次會議 §1–2; numbers from results/study1_v2/analysis/de_pooled.csv, de_differences.csv</span><span>5</span></div>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <div class="kicker">Meeting 2 · 18 Nov · decisions</div>
+  <h2>Measurement and design choices settled at Meeting 2</h2>
+  <table class="small">
+    <tr><th style="width:20%">Topic</th><th style="width:48%">Decision</th><th>Note</th></tr>
+    <tr><td>Benchmark</td><td>Compare <b>odds ratios</b>, not levels. Report marginal effects (P(sell | G=1) − P(sell | G=0)). Align one period to one trading day.</td><td>Rough check: your OR ≈ 2.74 vs. Barber's 2.63</td></tr>
+    <tr><td>Memory</td><td>0 = none (baseline), 1 = history, 2 = + reflection. RAG and fine-tuning are out.</td><td>Placebo concern: prompt length differs across arms</td></tr>
+    <tr><td>Paths</td><td><b>Monte Carlo</b>, not bootstrap (the bootstrap assumes a stable distribution). A martingale can't fix the endpoint.</td><td>Justin's deck recommended i.i.d. bootstrap; the meeting chose MC</td></tr>
+    <tr><td>Contamination</td><td>Min-K% dropped (the API returns no input-token probabilities). Prices are clean by construction. Paper contamination is unsolved.</td><td>Planned: de-label + repeated runs + power check</td></tr>
+    <tr><td>Cost basis (G)</td><td>Use Barber's <b>variable average cost</b> for the pilot. Fixed cost is cleaner but less comparable.</td><td>Open: what happens when an agent is fully sold out?</td></tr>
+    <tr><td>Regression</td><td>Panel i × j × t. Add Memory × G and controls (dd, period, persona, seed). Test return and dd together.</td><td>Try clustering by path and by agent</td></tr>
+    <tr><td>Workflow</td><td>GitHub with personal branches and PRs. Only two advisor meetings, so pick questions carefully.</td><td></td></tr>
+  </table>
+  <div class="foot"><span>Notion: 第二次會議 §3–8; Meeting2_slides_beamer_EN.pdf (Justin)</span><span>6</span></div>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <div class="kicker">Advisor consultation · 24 Nov · Prof. 陳彥行 · <span style="color:var(--warn)">draft input</span></div>
+  <h2>The professor's first take: memory alone won't reproduce the DE, so prompt the psychology</h2>
+  <div class="quote">“We are making AI <i>reproduce</i> the disposition effect, not writing an academic paper.”</div>
+  <div class="grid3">
+    <div class="card ok"><h3>Still kept</h3><ul class="small">
+      <li>Persona prompts grounded in the literature: prospect theory, mental accounting, regret aversion, realization utility.</li>
+      <li>Persona families: psychological, demographic, investment experience.</li>
+      <li>Memory architecture unchanged, paired with personas.</li>
+      <li>G uses the <b>average cost</b>, shown to every agent. Robustness check: “remembers only the first purchase”.</li>
+      <li><b>Cluster by path.</b> No de-labeling.</li></ul></div>
+    <div class="card warn"><h3>Overridden by SinoPac</h3><ul class="small">
+      <li>“Not causal, ignore endogeneity.” SinoPac wants rigor and treatment vs. control.</li>
+      <li>Goal of <i>reproducing</i> the DE at any cost, including telling the agent it has one. SinoPac wants to know whether the <b>persona</b> drives behaviour.</li>
+      <li>“Don't show regressions.” SinoPac needs each parameter's weight.</li></ul></div>
+    <div class="card"><h3>Context</h3><ul class="small">
+      <li>Known result: experienced and high-frequency traders show a smaller DE. This is a testable persona prediction.</li>
+      <li>Don't anchor on the 1995–99 regime.</li>
+      <li>The next advisor meeting is 8 Dec 19:00. Tell him about the change of direction.</li></ul></div>
+  </div>
+  <div class="foot"><span>Notion: 第一次諮詢會議 (+ raw notes)</span><span>7</span></div>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <div class="kicker">The professor's draft framework · status under the SinoPac direction</div>
+  <h2>His prompt factors survive as persona parameters, his goal does not</h2>
+  <div class="grid2" style="grid-template-columns:1.25fr 1fr">
+    <div>
+      <table class="small">
+        <tr><th>實驗變數 Factor</th><th>Levels (draft)</th><th>Now</th></tr>
+        <tr><td>行為偏誤 Bias cue</td><td>unspecified / explicitly “has DE”</td><td><span class="tag warn">control only</span>Bypasses the persona. Use it as an upper bound or manipulation check.</td></tr>
+        <tr><td>心理特徵 Psychology</td><td>PT, mental accounting, regret aversion, realization utility</td><td><span class="tag ok">kept</span>Persona parameter</td></tr>
+        <tr><td>投資人特徵 Traits</td><td>literacy, experience, expertise</td><td><span class="tag ok">kept</span>Plus Taiwan demographics</td></tr>
+        <tr><td>累積記憶 Memory</td><td>none / history / + reflection</td><td><span class="tag ok">kept</span>Required: no one-shot</td></tr>
+        <tr><td>市場認知 Market cognition</td><td>told / not told how returns are generated</td><td><span class="tag">optional</span>Parameter if budget allows</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>His research questions</h3>
+      <ol class="small" style="padding-left:22px;margin:0 0 14px">
+        <li>Which prompts reproduce the DE?</li>
+        <li>Is it stable?</li>
+        <li>Does memory help?</li>
+      </ol>
+      <p class="small muted" style="margin:0 0 14px">Replaced by the SinoPac questions on slide 10. Q2 and Q3 carry over almost unchanged.</p>
+      <h3>His three metrics</h3>
+      <table class="small">
+        <tr><td><b>Reproducibility</b></td><td>Still reported, but as an outcome, not the goal</td></tr>
+        <tr><td><b>Accuracy</b></td><td>Kept: SinoPac accepts literature values as the reference point</td></tr>
+        <tr><td><b>Stability</b></td><td>Kept: both ask for reruns</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="foot"><span>Draft: professor's post-meeting framework (Notion 第一次諮詢會議 §H). “Now” column is my mapping.</span><span>8</span></div>
+</section>
+
+<!-- 9 -->
+<section class="slide">
+  <div class="kicker">Official SinoPac consultation · 25 Nov · <span style="color:var(--ok)">the project now follows this</span></div>
+  <h2>What the bank and the association want</h2>
+  <div class="grid2">
+    <div>
+      <ul class="small">
+        <li><span class="tag">rigor</span><b>Rigor over practicality.</b> Past bank pilots couldn't say which parameters drove which outcome.</li>
+        <li><span class="tag">persona</span><b>Persona validity is the core question.</b> If outputs barely change across personas, the LLM is answering from its own parameters. Plan from the start how to measure each attribute's weight.</li>
+        <li><span class="tag">new field</span>Add a <b>reasoning field</b>: a faithful, detailed account of what the agent used to decide. It shows whether the persona and past experience drove the outcome.</li>
+        <li><span class="tag">design</span>Treatment and control groups. No one-shot prompts: decisions build on accumulated experience.</li>
+        <li><span class="tag">stability</span>Rerun the design and get the same result.</li>
+      </ul>
+    </div>
+    <div>
+      <ul class="small">
+        <li><b>Data:</b> public data and literature estimates such as Barber (2007) are acceptable benchmarks.</li>
+        <li><b>Models:</b> closed models are suggested but not required.</li>
+        <li><b>Scope:</b> one or two biases, at most three or four.</li>
+        <li><b>Null results have value</b>, for example “these 8 of 10 parameters don't matter.”</li>
+        <li><b>Report format:</b> title, abstract, then half a page of impact bullets. Write it like a pitch to funders.</li>
+        <li><b>Replication package:</b> a GitHub link is fine.</li>
+        <li><b>AI-use statement:</b> just describe the scope of AI use.</li>
+      </ul>
+      <div class="card accent" style="margin-top:12px"><p class="small" style="margin:0">The bank will use the results to find the <b>key parameters</b> for describing customers, and the LLM's <b>blind spots</b>: aspects where every persona answers the same way.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>Notion: 官方線上諮詢會議</span><span>9</span></div>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <div class="kicker">New direction</div>
+  <h2>From “can we reproduce the DE?” to “do persona settings really drive it?”</h2>
+  <div class="grid2">
+    <div>
+      <h3>Research questions</h3>
+      <ol class="small" style="padding-left:22px;margin:0">
+        <li><b>Persona validity.</b> Do the persona parameters we set change trading behaviour (PGR, PLR), or does the LLM act the same whatever the persona?</li>
+        <li><b>Key parameters and blind spots.</b> Which parameters move the disposition effect, by how much, and which make no difference?</li>
+        <li><b>Accumulated experience.</b> Does memory (trade history, reflection) shape decisions, judged from both outcomes and the reasoning field?</li>
+        <li><b>Stability.</b> Do the results hold across reruns and new price paths?</li>
+      </ol>
+      <p class="small muted" style="margin-top:12px">Benchmark: Barber et al. (2007) values as the reference point for direction and size, for example individuals' PGR/PLR ≈ 2.6 and institutions ≈ 0.7–0.9.</p>
+    </div>
+    <div>
+      <h3>Design</h3>
+      <ul class="small">
+        <li><b>Control:</b> a neutral persona with no psychology or trait description.</li>
+        <li><b>Treatments:</b> persona parameters (psychology, traits, demographics) randomized, each run on the same price paths.</li>
+        <li><b>Memory arms:</b> none / history / reflection, crossed with personas.</li>
+        <li><b>Upper bound:</b> “you have a DE” as a manipulation check only.</li>
+        <li><b>Output:</b> order + detailed reasoning. Code whether the reasoning cites the persona or past trades.</li>
+        <li><b>Estimate:</b> each parameter's effect on PGR − PLR, clustered by path. Rerun for stability.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Direction from SinoPac's notes; the exact wording of questions and design is my proposal, not yet agreed</span><span>10</span></div>
+</section>
+
+<!-- 11 -->
+<section class="slide">
+  <div class="kicker">Then vs. now</div>
+  <h2>How the design moved away from Prototype 1</h2>
+  <table class="small">
+    <tr><th style="width:18%"></th><th style="width:27%">Prototype 1</th><th style="width:27%">Professor's draft</th><th>Now (SinoPac)</th></tr>
+    <tr><td>Main question</td><td>Does memory change the DE?</td><td>Which prompts reproduce the DE?</td><td>Do persona parameters really drive the DE? Which ones matter?</td></tr>
+    <tr><td>Main treatment</td><td>Memory arms</td><td>Prompt factors, then memory</td><td>Persona parameters vs. neutral control, crossed with memory</td></tr>
+    <tr><td>Personas</td><td>3 ad hoc</td><td>Literature-based psychology, traits</td><td>Same, Taiwan profiles, each attribute's weight measured</td></tr>
+    <tr><td>“You have a DE”</td><td>Never</td><td>A factor level</td><td>Manipulation check only</td></tr>
+    <tr><td>Agent output</td><td>Order + one-sentence reason</td><td>Not discussed</td><td>Order + detailed reasoning field</td></tr>
+    <tr><td>Framing</td><td>Causal effect of memory</td><td>Reproduce, not causal</td><td>Rigorous treatment vs. control</td></tr>
+    <tr><td>Reporting</td><td>Logit / LPM</td><td>PGR / PLR only</td><td>PGR / PLR up front, parameter effects behind them</td></tr>
+    <tr><td>Success</td><td>β<sub>3</sub> ≠ 0</td><td>Positive, close to Barber, stable</td><td>Parameter effects, blind spots, stability. Nulls count.</td></tr>
+  </table>
+  <div class="foot"><span>Prototype 1: README / proposal 2. Draft: Notion 11/24. Now: Notion 11/25.</span><span>11</span></div>
+</section>
+
+<!-- 12 -->
+<section class="slide">
+  <div class="kicker">For you</div>
+  <h2>What this means for your work</h2>
+  <div class="grid2">
+    <div>
+      <h3>Your Meeting 2 to-dos, updated</h3>
+      <ul class="small">
+        <li><span class="tag">still on</span>Pilot with Barber's <b>variable average cost</b> and a larger sample. Check power.</li>
+        <li><span class="tag">still on</span>Review the PR. Test <b>return and dd together</b> in the regression. Regressions are back in scope.</li>
+        <li><span class="tag ok">now central</span><b>Persona redesign</b> as separable parameters with a neutral control, so each one's weight can be estimated.</li>
+        <li><span class="tag warn">dropped</span>De-label robustness test.</li>
+      </ul>
+      <h3 style="margin-top:16px">Likely code changes</h3>
+      <ul class="small">
+        <li>Build the persona prompt from parameters (psychology × traits × demographics), plus a neutral control.</li>
+        <li>Expand <code>reason</code> into a detailed reasoning field. Re-check the 800-token cap and budget.</li>
+        <li>Cluster by path. Add a stability metric across reruns (<code>llm.replicate_id</code>).</li>
+        <li>Per-parameter effect table and a “blind spot” view in the analysis and viewer.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Open issues for the team</h3>
+      <div class="card warn" style="margin-bottom:10px"><p class="small" style="margin:0"><b>Budget:</b> parameters × memory arms × reruns grows fast. Use a fractional design or fewer levels, sized from a pilot.</p></div>
+      <div class="card warn" style="margin-bottom:10px"><p class="small" style="margin:0"><b>Reasoning faithfulness:</b> what the model writes isn't proof of what drove it. Pair the reasoning field with outcome differences across personas.</p></div>
+      <div class="card warn" style="margin-bottom:10px"><p class="small" style="margin:0"><b>The professor:</b> his draft is overridden in part. Agree before 8 Dec how to present the change to him.</p></div>
+      <div class="card"><p class="small" style="margin:0"><b>Study 2:</b> keep, shelve, or appendix? SinoPac advised against chasing too many phenomena.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>Suggestions on this slide are mine, not team decisions</span><span>12</span></div>
+</section>
+
+<!-- 13 -->
+<section class="slide">
+  <div class="kicker">Next steps</div>
+  <h2>Before the 8 Dec advisor meeting and the 21 Dec upload</h2>
+  <div class="grid3">
+    <div class="card"><h3>This week</h3><ul class="small">
+      <li>Agree on the persona parameter list, each level tied to a citation</li>
+      <li>Add the neutral control and the reasoning field</li>
+      <li>Small pilot: do any parameters move PGR − PLR at all?</li></ul></div>
+    <div class="card"><h3>By 8 Dec</h3><ul class="small">
+      <li>Per-parameter effects on PGR, PLR and the ratio vs. 2.63, with blind spots</li>
+      <li>Memory arms crossed with personas</li>
+      <li>Present the new direction to the professor and pick questions</li></ul></div>
+    <div class="card accent"><h3>By 21 Dec</h3><ul class="small">
+      <li>Stability reruns and robustness (σ, horizon, model)</li>
+      <li>Report: abstract and impact bullets first, parameter table, blind spots, limitations</li>
+      <li>AI-use statement; GitHub replication package ($0 replay from cache)</li></ul></div>
+  </div>
+  <div class="foot"><span>Proposed sequencing; dates from Notion</span><span>13</span></div>
+</section>
+
+</div>
+<div id="hud"><span id="count"></span><button id="prev" aria-label="Previous">‹</button><button id="next" aria-label="Next">›</button></div>
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide')), i=0;
+  try{var h=parseInt(location.hash.slice(1),10); if(h>0&&h<=slides.length) i=h-1;}catch(e){}
+  function fit(){var s=Math.min(window.innerWidth/1340, window.innerHeight/770);
+    slides.forEach(function(el){el.style.transform='scale('+s+')';});}
+  function show(n){i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(el,k){el.classList.toggle('active',k===i);});
+    document.getElementById('count').textContent=(i+1)+' / '+slides.length;
+    try{history.replaceState(null,'','#'+(i+1));}catch(e){}}
+  document.addEventListener('keydown',function(e){
+    if(['ArrowRight','PageDown',' ','Enter'].indexOf(e.key)>=0){e.preventDefault();show(i+1);}
+    if(['ArrowLeft','PageUp','Backspace'].indexOf(e.key)>=0){e.preventDefault();show(i-1);}
+    if(e.key==='Home')show(0); if(e.key==='End')show(slides.length-1);});
+  document.getElementById('prev').onclick=function(){show(i-1);};
+  document.getElementById('next').onclick=function(){show(i+1);};
+  window.addEventListener('resize',fit); fit(); show(i);
+})();
+</script>
+</body>
+</html>
