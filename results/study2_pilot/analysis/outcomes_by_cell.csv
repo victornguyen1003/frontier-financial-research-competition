@@ -1,2 +1,0 @@
-cell,runs,no_trade_share,no_trade_share_sd,no_trade_share_min,no_trade_share_max,RAD,RAD_sd,RAD_min,RAD_max,RD,RD_sd,RD_min,RD_max,peak_overpricing,peak_overpricing_sd,peak_overpricing_min,peak_overpricing_max,crash,crash_sd,crash_min,crash_max,turnover,turnover_sd,turnover_min,turnover_max,volatility,volatility_sd,volatility_min,volatility_max,ret_autocorr_1,ret_autocorr_1_sd,ret_autocorr_1_min,ret_autocorr_1_max
-pilot,1,0.9,,0.9,0.9,0.0,,0.0,0.0,0.0,,0.0,0.0,0.0,,0.0,0.0,0.0,,0.0,0.0,0.07894736842105263,,0.07894736842105263,0.07894736842105263,,,,,,,,

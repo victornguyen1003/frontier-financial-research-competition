@@ -57,7 +57,7 @@ def reminder(study: str) -> str | None:
 
 
 def main():
-    studies = sys.argv[1:] or ["study1", "study2"]
+    studies = sys.argv[1:] or ["study1"]
     for study in studies:
         st = report(study)
         print(f"{study}: {st['entries']:,} cached replies ({st['bytes'] / 1e6:.1f} MB), "

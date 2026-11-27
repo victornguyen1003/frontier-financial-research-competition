@@ -1,6 +1,7 @@
 """Study 1 environment: pre-generated price paths and a cash + 5-stock brokerage account."""
 from __future__ import annotations
 
+import functools
 import json
 import random
 from dataclasses import dataclass, field
@@ -8,7 +9,8 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from llm_investors.agents.agent import EnvSpec
-from llm_investors.agents.prompts import ORDER_FORMAT_STUDY1
+from llm_investors.agents.prompts import ORDER_FORMAT_STUDY1, ORDER_FORMAT_STUDY1_V3
+from llm_investors.paths import ROOT
 
 
 def labels(n: int) -> list[str]:
@@ -32,6 +34,45 @@ def scenario_paths(mcfg: dict, seed: int, k: int):
                     "mu": mu, "sigma": sigma}
 
 
+def simulate_log_returns(rng: np.random.Generator, sigma_pool, df: float, n_stocks: int,
+                         periods: int) -> tuple[np.ndarray, np.ndarray]:
+    """Calibrated zero-drift returns (design v3), shape (periods, n_stocks), and each stock's
+    sigma: each stock draws its own monthly sigma from the empirical pool, and shocks are
+    Student-t(df) scaled to unit variance (needs df > 2)."""
+    sig = rng.choice(np.asarray(sigma_pool, dtype=float), size=n_stocks, replace=True)
+    eps = rng.standard_t(df, size=(periods, n_stocks)) * np.sqrt((df - 2) / df)
+    return eps * sig, sig
+
+
+@functools.lru_cache(maxsize=4)
+def load_calibration(path: str = "results/calibration/prices.json") -> dict:
+    p = ROOT / path
+    if not p.exists():
+        raise FileNotFoundError(f"{p} not found: run `calibrate` first (design v3 prices are "
+                                "calibrated to TEJ data)")
+    return json.loads(p.read_text())
+
+
+def calibrated_paths(mcfg: dict, seed: int, k: int):
+    """Design v3: ln P(t+1) = ln P(t) + sigma_i * eps_t, calibrated (plan §2.1). Scenario k
+    uses seed + k. Returns prices (periods + 1, n_stocks) and metadata with each sigma_i."""
+    cal = load_calibration(mcfg.get("calibration_file", "results/calibration/prices.json"))
+    rng = np.random.default_rng(seed + k)
+    n, T, s0 = mcfg["n_stocks"], mcfg["periods"], mcfg["start_price"]
+    df = float(cal["student_t"]["df"])
+    log_r, sig = simulate_log_returns(rng, cal["sigma_monthly"], df, n, T)
+    prices = np.round(s0 * np.exp(np.vstack([np.zeros(n), np.cumsum(log_r, axis=0)])), 2)
+    return prices, {"scenario": k, "seed": seed + k, "generator": "calibrated_t_random_walk",
+                    "sigmas": [round(float(x), 6) for x in sig], "df": df}
+
+
+def paths_for(mcfg: dict, seed: int, k: int):
+    """Dispatch on market.generator: log_random_walk (designs v1/v2) or calibrated (v3)."""
+    if mcfg.get("generator", "log_random_walk") == "calibrated":
+        return calibrated_paths(mcfg, seed, k)
+    return scenario_paths(mcfg, seed, k)
+
+
 # --------------------------------------------------------------------------- prompts
 # design v1 (first pilot): ended with "You have no other information about the companies or
 # the market", and agents held almost everything (DE defined in 10/45 pilot runs).
@@ -50,8 +91,16 @@ you decide whether to buy, sell or hold. Trades execute at today's price. There 
 taxes. You cannot borrow or short: you can sell at most the shares you hold, and buy only with \
 the cash you have."""
 
+# design v3 (prototype 2): average cost and the full price history since month 0.
+RULES_V3 = """You manage your own brokerage account. It holds cash and five stocks, called Stock A, \
+Stock B, Stock C, Stock D and Stock E. Each period is one month. Each month you see your \
+account, the average cost of each position, today's price of each stock and its price history \
+since month 0, and for each stock you decide whether to buy, sell or hold. Trades execute at \
+today's price. There are no fees or taxes. You cannot borrow or short: you can sell at most \
+the shares you hold, and buy only with the cash you have."""
+
 RULES = RULES_V2
-DESIGNS = {"v1": RULES_V1, "v2": RULES_V2}
+DESIGNS = {"v1": RULES_V1, "v2": RULES_V2, "v3": RULES_V3}
 
 
 def rules(design: str = "v2") -> str:
@@ -64,8 +113,9 @@ def rules(design: str = "v2") -> str:
 
 def env_spec(n_stocks: int, design: str = "v2") -> EnvSpec:
     labs = labels(n_stocks)
-    return EnvSpec(rules=rules(design), labels=labs,
-                   order_format=ORDER_FORMAT_STUDY1.format(labels=", ".join(labs)))
+    fmt = ORDER_FORMAT_STUDY1_V3 if design == "v3" else ORDER_FORMAT_STUDY1
+    return EnvSpec(rules=rules(design), labels=labs, order_format=fmt.format(labels=", ".join(labs)),
+                   reasoning=design == "v3", design=design)
 
 
 def recent_prices(prices, t: int, labs: list[str], months: int) -> dict[str, list[float]]:
@@ -75,10 +125,17 @@ def recent_prices(prices, t: int, labs: list[str], months: int) -> dict[str, lis
     return {s: [float(prices[k, i]) for k in range(lo, t)] for i, s in enumerate(labs)}
 
 
+def price_history(prices, t: int, labs: list[str]) -> dict[str, list[float]]:
+    """Design v3: each stock's prices in months 0 .. t-1 (market information, every arm)."""
+    return {s: [float(prices[k, i]) for k in range(t)] for i, s in enumerate(labs)}
+
+
 def state_block(t: int, T: int, acct: "Account", prices_t: dict, show_pnl: bool = True,
-                recent: dict[str, list[float]] | None = None) -> str:
+                recent: dict[str, list[float]] | None = None,
+                history: dict[str, list[float]] | None = None) -> str:
     """show_pnl=False (ablation) drops the computed gain/loss column; average cost stays.
-    `recent` (design v2) adds a table of each stock's prices in recent months."""
+    `recent` (design v2) adds a table of each stock's prices in recent months; `history`
+    (design v3) adds the full price history since month 0."""
     rows = ["stock | shares | average cost | price today" +
             (" | gain/loss vs average cost" if show_pnl else "")]
     for s, pos in acct.pos.items():
@@ -96,6 +153,14 @@ def state_block(t: int, T: int, acct: "Account", prices_t: dict, show_pnl: bool 
         lines = ["Recent prices:", "stock | " + " | ".join(ago + ["today"])]
         for s in acct.pos:
             lines.append(f"Stock {s} | " + " | ".join(f"{p:,.2f}" for p in recent[s])
+                         + f" | {prices_t[s]:,.2f}")
+        out += "\n\n" + "\n".join(lines)
+    if history:
+        n = max(len(v) for v in history.values())
+        lines = ["Price history:",
+                 "stock | " + " | ".join([f"month {k}" for k in range(n)] + ["today"])]
+        for s in acct.pos:
+            lines.append(f"Stock {s} | " + " | ".join(f"{p:,.2f}" for p in history[s])
                          + f" | {prices_t[s]:,.2f}")
         out += "\n\n" + "\n".join(lines)
     return out

@@ -36,11 +36,7 @@ def test_undefined_when_no_losses():
     assert r["PGR"] == 0.5 and r["PLR"] is None and r["DE"] is None
 
 
-def test_bubble_measures():
-    from llm_investors.measure.market_metrics import bubble_measures
-    fv = [40, 30, 20, 10]           # mean FV = 25
-    price = [40, 50, 25, 10]        # deviations 0, 20, 5, 0
-    m = bubble_measures(price, fv)
-    assert abs(m["RAD"] - 25 / 4 / 25) < 1e-12 and abs(m["RD"] - 25 / 4 / 25) < 1e-12
-    assert abs(m["peak_overpricing"] - 20 / 25) < 1e-12 and m["peak_period"] == 2
-    assert abs(m["crash"] - (1 - 10 / 50)) < 1e-12
+def test_ratio():
+    r = disposition([ob(1, 110, 100, True), ob(1, 120, 100, False), ob(1, 90, 100, True),
+                     ob(1, 80, 100, False), ob(1, 85, 100, False), ob(1, 70, 100, False)])
+    assert r["PGR"] == 0.5 and r["PLR"] == 0.25 and r["Ratio"] == 2.0

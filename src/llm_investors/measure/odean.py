@@ -30,7 +30,8 @@ def ratios(c) -> dict:
     pgr = rg / (rg + pg) if rg + pg else None
     plr = rl / (rl + pl) if rl + pl else None
     return {"RG": rg, "RL": rl, "PG": pg, "PL": pl, "PGR": pgr, "PLR": plr,
-            "DE": pgr - plr if pgr is not None and plr is not None else None}
+            "DE": pgr - plr if pgr is not None and plr is not None else None,
+            "Ratio": pgr / plr if pgr is not None and plr else None}
 
 
 def disposition(obs: list[dict], sale_days_only: bool = True) -> dict:

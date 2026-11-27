@@ -1,21 +1,21 @@
-# Study 1: memory architecture and the disposition effect, on exogenous price paths.
-# Changing anything under `llm`, `personas` or `market`, or changing `seed`, alters the
-# prompts, so the next run makes new (paid) API calls. Analysis and plotting are free to redo.
+# Study 1: persona attributes, memory and the disposition effect, on exogenous price paths.
+# Changing anything under `llm`, `profiles`, `agents` or `market`, or changing `seed`, alters
+# the prompts, so the next run makes new (paid) API calls. Analysis and plotting are free.
 
 study: study1
 seed: 20261113            # controls the market paths only (scenario k uses seed + k)
-# Prompt design. v1 = first pilot (rules ended "You have no other information about the
-# companies or the market"; no price history): agents held ~98% of the time. v2 = neutral
-# monthly review without that sentence + recent prices for every arm (market.price_history).
-# Outputs go to study1_<design>* (v1 keeps the plain study1* names), all sharing one cache.
-design: v2
+# Prompt design. v1/v2 = prototype 1 (three fixed personas; kept so their prompts stay
+# reproducible). v3 = prototype 2 (docs/prototype-2-plan.md): attribute-based personas,
+# calibrated prices, full price history, a required reasoning field. Outputs go to
+# study1_<design>_<model>* (v3) / study1_<design>* (v2), all sharing one cache.
+design: v3
 
 llm:
   backend: openai         # openai | dummy (rule-based agents, no API, for testing)
-  model: gpt-6-luna
+  model: gpt-6-luna       # main-run model; pilots pass --model gpt-6-luna / gpt-6.2-sol
   service_tier: flex      # half price, slower
   reasoning_effort: low
-  max_output_tokens: 800  # includes reasoning tokens
+  max_output_tokens: 1200 # includes reasoning tokens
   max_incomplete_retries: 5  # incomplete replies (cap hit) are retried, never parsed or held;
                              # after this many in a row on one request the run stops
   json_mode: true         # text.format = json_object; replies are still validated
@@ -24,12 +24,35 @@ llm:
   # USD per 1M tokens for the tier in use. Cached input defaults to the full input price
   # (conservative) until the actual cached rate is confirmed.
   price_per_mtok: {input: 0.05, cached_input: 0.05, output: 0.25}
+  # Expected output tokens per decision call, for the dry-run "typical" projection only (the
+  # upper bound always uses max_output_tokens). Replace with the pilot's measured value.
+  est_output_tokens: 450
+  # Prices for `run-study1 --model <id>` (other models than `model` above). A paid run with a
+  # model missing here stops before any call. An entry may override service_tier.
+  model_prices:
+    gpt-6-luna: {input: 0.05, cached_input: 0.05, output: 0.25}
+    # UNCONFIRMED: Standard-tier list price from third-party trackers (Nov 2026); they report
+    # no Flex tier for gpt-6.2-sol. Confirm on the OpenAI pricing page before the Sol pilot.
+    gpt-6.2-sol: {input: 2.00, cached_input: 0.10, output: 10.00}
 
 budget:
-  cap_usd: 4.00           # hard stop for the whole study (pilot + full, cumulative)
+  # Prototype 2 alone (fresh cache): hard stop for everything in cache/study1/, cumulative
+  # over pilots, tagging and the main run.
+  cap_usd: 10.00
+  # Per-stage limits (plan §8). Each invocation also stops at its stage's limit, and every
+  # paid stage shows a projection and asks before its first call.
+  stage_limits:
+    pilot_gpt-6-luna: 1.0
+    pilot_gpt-6.2-sol: 2.0
+    tagging: 0.5
+    full: 6.5
+
+profiles:
+  n: 30                   # default P for the main run (power analysis may change it)
+  seed: 20261127          # profile draws; prefix-stable, so the pilot's 8 are the main run's first 8
 
 agents:
-  personas: [young_active, retiree, experienced]
+  personas: [young_active, retiree, experienced]   # designs v1/v2 only
   architectures: [none, log, reflect]
   reflect_after: [5, 10]
   json_retries: 1         # malformed reply -> retry once, then fall back to hold (logged)
@@ -38,25 +61,46 @@ market:
   n_stocks: 5
   periods: 15             # 1 period = 1 month
   start_price: 100.0
-  # Driftless log-price random walk: ln P(t+1) = ln P(t) + mu + sigma * Z.
-  # With mu = 0 the median price stays at start_price, so gains and losses are equally likely.
-  mu: 0.0                 # drift of monthly log returns
-  sigma: 0.10             # standard deviation of monthly log returns
-  # The prompt shows a "gain/loss vs average cost" column (and "% vs your average cost" on
-  # sales in the log history). false = ablation without them (run-study1 --no-pnl writes to
-  # study1_nopnl*); the default keeps the main design's prompts and cache keys unchanged.
-  show_pnl: true
-  # Months of past prices shown per stock in every arm (market information, not memory).
-  # 0 = none (design v1). Early periods show fewer months.
-  price_history: 3
+  # v3: calibrated zero-drift random walk (results/calibration/prices.json): per-stock monthly
+  # sigma drawn from the TEJ distribution, Student-t shocks. v1/v2: log_random_walk below.
+  generator: calibrated
+  calibration_file: results/calibration/prices.json
+  mu: 0.0                 # log_random_walk only: drift of monthly log returns
+  sigma: 0.10             # log_random_walk only: sd of monthly log returns
+  show_pnl: true          # show the "gain/loss vs average cost" column
+  # Price history shown to every arm (market information, not memory): "all" = months
+  # 0 .. t-1 (v3); an integer = that many recent months (v2: 3); 0 = none (v1).
+  price_history: all
 
 portfolio:
   initial_cash: 50000.0
   initial_shares: 100     # of every stock, bought at the start price (period 0)
 
 stages:
-  pilot: {scenarios: 5}
-  full: {scenarios: 100}
+  pilot: {profiles: 8, scenarios: 5}      # (8 + C0 + C1) x 5 x 3 = 150 runs, once per model
+  full: {profiles: 30, scenarios: 15}     # 1,440 runs; set from the power analysis (§2.5)
+
+calibration:
+  tej_path: data/raw/tej/fulldata_1995to1999.csv   # licensed, git-ignored
+  tdcc_age_path: data/investor_statistics.csv
+  tdcc_source_url: null   # TODO: URL of the TDCC "Investors with Trading Accounts by Age" page
+  attribute_data_path: data/attribute_data.csv
+  seed: 0
+
+tagging:
+  model: gpt-6-luna       # reasoning-tag classifier (plan §4.2)
+  reasoning_effort: low
+  max_output_tokens: 1500
+  batch_size: 20          # reasoning texts per classifier call
+  validation_sample: 100
+
+power:
+  profiles: [20, 30, 40]
+  scenarios: [10, 15, 20]
+  n_sims: 500
+  delta: 0.05             # effect of every attribute (and memory arm) on PGR - PLR
+  blind_spot_band: 0.03
+  seed: 7
 
 run:
   workers: 16             # agent-runs in parallel

@@ -45,8 +45,8 @@ def parse_orders(text: str, labels: list[str], one_order: bool = False,
                  require_limit: bool = False) -> list[dict]:
     """Return one normalized order per label: {stock, action, quantity, limit_price, reason}.
 
-    Study 1: labels = A..E, every stock needs an entry (a missing stock is an InvalidReply).
-    Study 2: one_order=True (single stock), require_limit=True for buy/sell.
+    labels = A..E: every stock needs an entry (a missing stock is an InvalidReply).
+    one_order / require_limit: single-stock, limit-order variant (kept for the parser tests).
     """
     obj = extract_json(text)
     orders = obj.get("orders")
@@ -90,39 +90,26 @@ def parse_orders(text: str, labels: list[str], one_order: bool = False,
     return sorted(out, key=lambda o: order_ix[o["stock"]])
 
 
-def _positive_price(v, side: str) -> float:
-    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v <= 0:
-        raise InvalidReply(f"limit_price must be a positive number for the {side} order, got {v!r}")
-    return float(v)
+MAX_REASONING_CHARS = 1000
 
 
-def parse_quotes(text: str, label: str = "A") -> list[dict]:
-    """Study 2 design v2: exactly one buy and one sell order for `label`, each with a positive
-    limit price and an integer quantity >= 0, and buy limit < sell limit (so an agent can never
-    trade with itself). Returns [buy, sell] as normalized orders. Whether a quantity of 0 is
-    allowed depends on the agent's account; that is checked by the environment (quote_check)."""
+def parse_reasoning(obj: dict) -> str:
+    """Design v3: "reasoning" is required, non-empty and at most 1,000 characters."""
+    r = obj.get("reasoning")
+    if not isinstance(r, str) or not r.strip():
+        raise InvalidReply('"reasoning" must be a non-empty string (3-5 sentences)')
+    r = r.strip()
+    if len(r) > MAX_REASONING_CHARS:
+        raise InvalidReply(f'"reasoning" is {len(r)} characters; keep it to 3-5 sentences '
+                           f"(at most {MAX_REASONING_CHARS} characters)")
+    return r
+
+
+def parse_decision_v3(text: str, labels: list[str]) -> dict:
+    """{"reasoning": str, "orders": [...]}: the orders are validated exactly as in v1/v2."""
     obj = extract_json(text)
-    orders = obj.get("orders")
-    if not isinstance(orders, list) or len(orders) != 2:
-        raise InvalidReply('"orders" must be a list of exactly two entries: one buy and one sell')
-    by_side = {}
-    for o in orders:
-        if not isinstance(o, dict):
-            raise InvalidReply("each order must be a JSON object")
-        if o.get("stock") and _label(o.get("stock")) != label:
-            raise InvalidReply(f"unknown stock {o.get('stock')!r}")
-        a = str(o.get("action", "")).strip().lower()
-        if a not in ("buy", "sell"):
-            raise InvalidReply(f"action must be buy or sell, got {o.get('action')!r}")
-        if a in by_side:
-            raise InvalidReply(f"two {a} orders; give exactly one buy and one sell")
-        by_side[a] = {"stock": label, "action": a,
-                      "quantity": _int(o.get("quantity", 0), f"{a} quantity"),
-                      "limit_price": _positive_price(o.get("limit_price"), a),
-                      "reason": str(o.get("reason", ""))[:300]}
-    if by_side["buy"]["limit_price"] >= by_side["sell"]["limit_price"]:
-        raise InvalidReply("the sell limit_price must be higher than the buy limit_price")
-    return [by_side["buy"], by_side["sell"]]
+    reasoning = parse_reasoning(obj)
+    return {"reasoning": reasoning, "orders": parse_orders(text, labels)}
 
 
 def parse_lessons(text: str) -> list[str]:

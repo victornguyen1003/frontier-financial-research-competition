@@ -21,3 +21,9 @@ cache/**/*.tmp
 results/*_dummy/
 results/*_dryrun/
 
+
+# Licensed raw data (TEJ). Never commit it; only the derived results/calibration/ JSON is
+# committed, and the price generator / persona builder read only that.
+/data/raw/**
+!/data/raw/**/
+!/data/raw/**/README.md

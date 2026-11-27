@@ -1,10 +1,14 @@
 """Build analysis datasets from the .jsonl logs (free to re-run; no API calls).
 
-    build-dataset study1
-    build-dataset study2
-Writes results/<study>/positions.parquet (+ .csv), decisions.* (sale days only),
-runs.* (run-level PGR/PLR/DE and observability counts), lessons.csv,
-and for Study 2 markets.* and market_periods.*.
+    build-dataset study1_v3_gpt-6-luna_pilot
+
+Writes results/<name>/:
+  runs.*        one row per run: persona/profile, attribute columns, run-level PGR/PLR/DE and
+                observability counts
+  positions.*   one row per position held at the start of a period (all periods)
+  decisions.*   positions on sale days only (Odean's sample; the §5.2 regression rows)
+  reasoning.*   one row per run x period: the decision's `reasoning` text (design v3)
+  lessons.csv   reflection lessons
 """
 from __future__ import annotations
 
@@ -14,9 +18,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import market_metrics, odean
+from llm_investors.agents.personas import ATTRIBUTE_KEYS
+from llm_investors.paths import ROOT
 
-from llm_investors.paths import ROOT  # noqa: E402
+from . import odean
+
+META_KEYS = ("run_id", "architecture", "persona", "persona_kind", "n_active", "scenario",
+             "model", "design")
 
 
 def read_log(path: Path) -> list[dict]:
@@ -57,6 +65,7 @@ def observability(events: list[dict]) -> dict:
         # replies that left out a stock (invalid -> retried; never a silent hold)
         "omitted_stock_replies": sum(str(e.get("error") or "").startswith("missing an entry")
                                      for e in calls),
+        "reasoning_errors": sum('"reasoning"' in str(e.get("error") or "") for e in calls),
         "orders_rejected": sum(e["type"] == "order_rejected" for e in events),
         "input_tokens": sum(e["usage"].get("input_tokens", 0) for e in calls if e["usage"]),
         "output_tokens": sum(e["usage"].get("output_tokens", 0) for e in calls if e["usage"]),
@@ -65,73 +74,58 @@ def observability(events: list[dict]) -> dict:
     }
 
 
+def run_meta(start: dict) -> dict:
+    meta = {k: start.get(k) for k in META_KEYS if k in start}
+    prof = start.get("profile")
+    if prof:
+        meta |= {f"attr_{k}": int(prof.get(k, 0)) for k in ATTRIBUTE_KEYS}
+    return meta
+
+
 def build(study: str) -> dict[str, pd.DataFrame]:
-    pos_rows, run_rows, lesson_rows, market_rows, mper_rows = [], [], [], [], []
+    pos_rows, run_rows, lesson_rows, reason_rows = [], [], [], []
     for path in run_logs(study):
         ev = read_log(path)
         start = next((e for e in ev if e["type"] == "run_start"), None)
         end = next((e for e in ev if e["type"] == "run_end"), None)
         if start is None:
             continue
-        meta = {k: start[k] for k in start if k in
-                ("run_id", "architecture", "persona", "scenario", "cell", "replicate",
-                 "agent_mix", "memory", "price_limit", "transaction_tax", "n_agents")}
+        meta = run_meta(start)
         complete = end is not None and end.get("status") == "complete"
-        obs = [o for e in ev if e["type"] == "period_end" for o in e["observations"]]
+        obs = []
+        for e in ev:
+            if e["type"] != "period_end":
+                continue
+            obs += e["observations"]
+            if "reasoning" in e:
+                trades = [o for o in e["orders"] if o["action"] != "hold"]
+                reason_rows.append({**meta, "period": e["period"], "reasoning": e["reasoning"],
+                                    "fallback": e["reasoning"] is None,
+                                    "n_sells": sum(o["action"] == "sell" for o in trades),
+                                    "n_buys": sum(o["action"] == "buy" for o in trades),
+                                    "actions": "".join(o["action"][0].upper()
+                                                       for o in e["orders"])})
         for o in obs:
             o.update(meta)
         pos_rows += obs
         for e in ev:
             if e["type"] == "reflection":
                 lesson_rows.append({**meta, "agent": e["agent"], "period": e["period"],
-                                    "persona_of_agent": e["persona"],
                                     **{f"lesson_{i + 1}": x for i, x in enumerate(e["lessons"])}})
-        obsv = observability(ev)
-        if study.startswith("study1"):
-            run_rows.append({**meta, "complete": complete,
-                             "status": end.get("status") if end else "crashed", **obsv,
-                             **odean.disposition(obs, True),
-                             **{f"{k}_allperiods": v for k, v in
-                                odean.disposition(obs, False).items()},
-                             "final_value": end.get("final_value") if end else None})
-        else:
-            auctions = [e for e in ev if e["type"] == "auction_cleared"]
-            T = len(auctions)
-            if T:
-                price = [a["price"] for a in auctions]
-                fv = [a["fundamental_value"] for a in auctions]
-                traded = [a["traded"] for a in auctions]
-                for a in auctions:
-                    mper_rows.append({**meta, "period": a["period"], "price": a["price"],
-                                      "fv": a["fundamental_value"], "volume": a["volume"],
-                                      "traded": a["traded"], "imbalance": a["imbalance"],
-                                      "dividend": a.get("dividend")})
-                market_rows.append({**meta, "complete": complete,
-                                    "status": end.get("status") if end else "crashed",
-                                    "periods": T, **obsv,
-                                    **market_metrics.bubble_measures(price, fv, traded),
-                                    **market_metrics.trading_measures(
-                                        price, [a["volume"] for a in auctions],
-                                        start["total_shares"], traded),
-                                    **odean.disposition(obs, False)})
-            else:  # stopped before the first auction: keep the row for observability counts
-                market_rows.append({**meta, "complete": complete,
-                                    "status": end.get("status") if end else "crashed",
-                                    "periods": 0, **obsv})
-            # agent-level DE inside the market, by persona
-            for (agent, persona), g in pd.DataFrame(obs).groupby(["agent", "agent_persona"]) \
-                    if obs else []:
-                run_rows.append({**meta, "agent": agent, "agent_persona": persona,
-                                 "complete": complete,
-                                 **odean.disposition(g.to_dict("records"), False)})
+        run_rows.append({**meta, "complete": complete,
+                         "status": end.get("status") if end else "crashed",
+                         "sale_days": len({o["period"] for o in obs if o["sold"]}),
+                         **observability(ev), **odean.disposition(obs, True),
+                         **{f"{k}_allperiods": v for k, v in
+                            odean.disposition(obs, False).items()},
+                         "final_value": end.get("final_value") if end else None})
     dfs = {"positions": pd.DataFrame(pos_rows), "runs": pd.DataFrame(run_rows),
            "lessons": pd.DataFrame(lesson_rows)}
+    if reason_rows:
+        dfs["reasoning"] = pd.DataFrame(reason_rows)
     if not dfs["positions"].empty:
         p = dfs["positions"]
         dfs["decisions"] = p[p["sale_day"] == 1].reset_index(drop=True)
-    if study.startswith("study2"):
-        dfs["markets"] = pd.DataFrame(market_rows)
-        dfs["market_periods"] = pd.DataFrame(mper_rows)
     return dfs
 
 
@@ -144,7 +138,7 @@ def main(study: str):
 
 
 def cli():
-    main(sys.argv[1] if len(sys.argv) > 1 else "study1")
+    main(sys.argv[1] if len(sys.argv) > 1 else "study1_v3_gpt-6-luna")
 
 
 if __name__ == "__main__":

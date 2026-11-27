@@ -1,4 +1,4 @@
-"""Prompt builder shared by both studies.
+"""Prompt builder for Study 1 (designs v1-v3).
 
 Layout (fixed content first so provider-side prompt caching can reuse the prefix):
   system  = environment rules + persona + reply format [+ replicate line]   (fixed per run)
@@ -11,22 +11,12 @@ ORDER_FORMAT_STUDY1 = """Reply with ONLY a compact JSON object, no other text:
 {{"orders":[{{"stock":"A","action":"buy|sell|hold","quantity":<int>,"limit_price":null,"reason":"<one short sentence>"}}, ...]}}
 Give exactly one entry for each of {labels}. Use quantity 0 for hold."""
 
-ORDER_FORMAT_STUDY2 = """Reply with ONLY a compact JSON object, no other text:
-{{"orders":[{{"stock":"A","action":"buy|sell|hold","quantity":<int>,"limit_price":<number or null>,"reason":"<one short sentence>"}}]}}
-Give exactly one entry. For buy or sell, limit_price is the highest price you will pay \
-(buy) or the lowest price you will accept (sell). For hold, use quantity 0 and limit_price null."""
-
-# Study 2 design v2: a two-sided quote every period (a buy and a sell order), so the auction
-# always has both sides of the market. Design v1 (one order, ORDER_FORMAT_STUDY2) let every
-# agent offer to sell with nobody bidding, and the price froze.
-QUOTE_FORMAT_STUDY2 = """Reply with ONLY a compact JSON object, no other text:
-{"orders":[{"stock":"A","action":"buy","quantity":<int>,"limit_price":<number>,"reason":"<one short sentence>"},{"stock":"A","action":"sell","quantity":<int>,"limit_price":<number>,"reason":"<one short sentence>"}]}
-Give exactly two entries: one buy and one sell. The buy limit_price is the highest price you \
-will pay; the sell limit_price is the lowest price you will accept and must be higher than \
-your buy limit_price. Each quantity must be at least 1, except: use sell quantity 0 if you own \
-no shares, and buy quantity 0 if your cash cannot pay for one share at your buy limit_price. \
-An order executes only if the auction price is at or below your buy limit or at or above your \
-sell limit."""
+# design v3 (prototype 2): a required free-text "reasoning" field before the orders.
+ORDER_FORMAT_STUDY1_V3 = """Reply with ONLY a compact JSON object, no other text:
+{{"reasoning":"<3-5 sentences: what you considered this month and why>",
+ "orders":[{{"stock":"A","action":"buy|sell|hold","quantity":<int>,"limit_price":null,
+            "reason":"<one short sentence>"}}, ...]}}
+Give exactly one entry for each of {labels}. Use quantity 0 for hold."""
 
 REFLECT_FORMAT = """Reply with ONLY a compact JSON object, no other text:
 {"lessons":["<lesson 1>","<lesson 2>","<lesson 3>"]}"""
@@ -74,6 +64,10 @@ def correction_message(error: str) -> str:
     return (f"Your reply could not be used: {error}. "
             "Reply again with ONLY the JSON object in the required format.")
 
+
+# design v3 memory blocks (plan §3.2)
+RECORD_HEADER_V3 = "Your record so far:"
+LESSONS_HEADER_V3 = "Lessons from your own trading so far:"
 
 # Phrases that must never appear in any prompt (avoid demand effects). Checked in tests.
 BANNED_TERMS = ("disposition", "loss aversion", "loss-aversion", "bias", "behavioral",

@@ -79,17 +79,20 @@ def _json_default(o):
 
 
 def make_llm(cfg: dict, name: str, dry_run: bool, show_prompts: int, echo=print,
-             offline: bool = False, retry_incomplete: bool = False):
+             offline: bool = False, retry_incomplete: bool = False,
+             stage_limit: float | None = None):
     cache = DiskCache(ROOT / "cache" / cfg["study"])
     prices = cfg["llm"]["price_per_mtok"]
     real = cfg["llm"]["backend"] == "openai" and not dry_run
     shared = cache.stats(lambda u: price_usage(prices, u))["paid_usd"] if real else 0.0
     cost = CostTracker(cfg["budget"]["cap_usd"], prices,
-                       ROOT / "cache" / cfg["study"] / "spend.json", shared_spent=shared)
+                       ROOT / "cache" / cfg["study"] / "spend.json", shared_spent=shared,
+                       session_cap=stage_limit if real else None)
     if real:
         echo(f"Budget {cfg['study']}: ${cost.spent_before:.4f} of ${cost.cap:.2f} already "
              f"spent (shared cache ${shared:.4f}, this machine's ledger "
-             f"${cost.local_spent:.4f}).")
+             f"${cost.local_spent:.4f})"
+             + (f"; this stage may spend at most ${stage_limit:.2f}." if stage_limit else "."))
     return LLMClient(cfg["llm"], cache, cost, dry_run=dry_run, show_prompts=show_prompts,
                      echo=echo, offline=offline, retry_incomplete=retry_incomplete)
 

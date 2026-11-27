@@ -25,8 +25,10 @@ class BudgetExceeded(RuntimeError):
 
 class CostTracker:
     def __init__(self, cap_usd: float, prices: dict, ledger: str | Path,
-                 shared_spent: float = 0.0):
+                 shared_spent: float = 0.0, session_cap: float | None = None):
         self.cap = float(cap_usd)
+        # Stage limit (plan §8): what this invocation may spend, on top of the overall cap.
+        self.session_cap = None if session_cap is None else float(session_cap)
         self.prices = prices
         self.ledger = Path(ledger)
         self.lock = threading.Lock()
@@ -55,6 +57,11 @@ class CostTracker:
                 raise BudgetExceeded(
                     f"budget cap ${self.cap:.2f} reached (spent ${self.spent:.4f}, "
                     f"in flight ${self.reserved:.4f})")
+            if self.session_cap is not None and \
+                    self.session["spent_usd"] + self.reserved + amount > self.session_cap:
+                raise BudgetExceeded(
+                    f"stage limit ${self.session_cap:.2f} reached (this stage spent "
+                    f"${self.session['spent_usd']:.4f}, in flight ${self.reserved:.4f})")
             self.reserved += amount
         return amount
 
@@ -83,4 +90,5 @@ class CostTracker:
 
     def summary(self) -> dict:
         with self.lock:
-            return {**self.session, "spent_total_usd": round(self.spent, 6), "cap_usd": self.cap}
+            return {**self.session, "spent_total_usd": round(self.spent, 6), "cap_usd": self.cap,
+                    "stage_limit_usd": self.session_cap}

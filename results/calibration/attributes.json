@@ -1,0 +1,91 @@
+{
+  "younger_age": 30,
+  "older_age": 59,
+  "younger_age_exact": 29.72,
+  "older_age_exact": 59.17,
+  "method": "Median age within each group by linear interpolation inside TDCC age brackets; younger = brackets up to age 40, older = 41 and over (TDCC brackets end at 40, so this is the boundary nearest to the plan's 40); institutions excluded.",
+  "groups": {
+    "younger": {
+      "brackets": [
+        "0--19 Years",
+        "20--30 Years",
+        "31--40 Years"
+      ],
+      "investors": 5258947.0
+    },
+    "older": {
+      "brackets": [
+        "41--50 Years",
+        "51--60 Years",
+        "61Years & Over"
+      ],
+      "investors": 9448509.0
+    }
+  },
+  "tdcc_age_distribution": {
+    "title": "2026/10 Investors with Trading Accounts by Age",
+    "brackets": [
+      {
+        "label": "0--19 Years",
+        "lo": 0,
+        "hi": 19,
+        "male": 472901.0,
+        "female": 434449.0,
+        "total": 907350.0
+      },
+      {
+        "label": "20--30 Years",
+        "lo": 20,
+        "hi": 30,
+        "male": 986581.0,
+        "female": 963277.0,
+        "total": 1949858.0
+      },
+      {
+        "label": "31--40 Years",
+        "lo": 31,
+        "hi": 40,
+        "male": 1192840.0,
+        "female": 1208899.0,
+        "total": 2401739.0
+      },
+      {
+        "label": "41--50 Years",
+        "lo": 41,
+        "hi": 50,
+        "male": 1295685.0,
+        "female": 1449330.0,
+        "total": 2745015.0
+      },
+      {
+        "label": "51--60 Years",
+        "lo": 51,
+        "hi": 60,
+        "male": 1098246.0,
+        "female": 1323304.0,
+        "total": 2421550.0
+      },
+      {
+        "label": "61Years & Over",
+        "lo": 61,
+        "hi": null,
+        "male": 2014873.0,
+        "female": 2267071.0,
+        "total": 4281944.0
+      }
+    ],
+    "institutions": 120013.0,
+    "share_female_individuals": 0.5198948070964822,
+    "file": "data/investor_statistics.csv",
+    "source_url": null
+  },
+  "sources": [
+    {
+      "attribute": "age",
+      "statistic": "investors by age bracket",
+      "value": "2026/10 Investors with Trading Accounts by Age",
+      "source_url": null,
+      "file": "data/investor_statistics.csv"
+    }
+  ]
+}
