@@ -1,0 +1,148 @@
+{
+  "alpha": 0.05,
+  "blind_spot_band": 0.03,
+  "rq3_memory_wald": {
+    "chi2": 5.57869100465912,
+    "q": 2,
+    "p_chi2": 0.06146142711471033,
+    "F": 2.78934550232956,
+    "df_denom": 4.0,
+    "p": 0.1743844095361224,
+    "terms": [
+      "gain:mem_log",
+      "gain:mem_reflect"
+    ]
+  },
+  "memory_coefs": {
+    "gain:mem_log": {
+      "coef": 0.09057117488023803,
+      "se": 0.044444424351720746,
+      "p": 0.11121483643855906,
+      "mde": 0.1652181334152466
+    },
+    "gain:mem_reflect": {
+      "coef": -0.11381915759885697,
+      "se": 0.058832254382313286,
+      "p": 0.1251460962451578,
+      "mde": 0.21870359208017123
+    }
+  },
+  "rq1_paired": {
+    "by_profile": {
+      "P00": {
+        "n_paths": 4,
+        "mean_diff": 0.8639724310776942,
+        "ci_lo": 0.6152882205513784,
+        "ci_hi": 1.1236842105263158,
+        "se": 0.15946639675066382,
+        "p_wilcoxon": 0.125,
+        "mde": 0.6635266991289221,
+        "p_holm": 1.0
+      },
+      "P01": {
+        "n_paths": 4,
+        "mean_diff": 0.9684752747252747,
+        "ci_lo": 0.7244505494505494,
+        "ci_hi": 1.2125,
+        "se": 0.1454050130753972,
+        "p_wilcoxon": 0.125,
+        "mde": 0.6050184260046274,
+        "p_holm": 1.0
+      },
+      "P02": {
+        "n_paths": 4,
+        "mean_diff": 1.4066964285714285,
+        "ci_lo": 1.282142857142857,
+        "ci_hi": 1.6339285714285714,
+        "se": 0.1146672736756695,
+        "p_wilcoxon": 0.125,
+        "mde": 0.4771211938719184,
+        "p_holm": 1.0
+      },
+      "P03": {
+        "n_paths": 4,
+        "mean_diff": 0.5084083850779856,
+        "ci_lo": 0.30621983954680065,
+        "ci_hi": 0.7105969306091705,
+        "se": 0.12448101725103311,
+        "p_wilcoxon": 0.125,
+        "mde": 0.5179553822234626,
+        "p_holm": 1.0
+      },
+      "P04": {
+        "n_paths": 4,
+        "mean_diff": 0.9861855158730158,
+        "ci_lo": 0.8612599206349206,
+        "ci_hi": 1.1578125,
+        "se": 0.09210730646099427,
+        "p_wilcoxon": 0.125,
+        "mde": 0.38325100627487,
+        "p_holm": 1.0
+      },
+      "P05": {
+        "n_paths": 4,
+        "mean_diff": 1.2638444888444889,
+        "ci_lo": 1.115521978021978,
+        "ci_hi": 1.4479895104895104,
+        "se": 0.09206597272831078,
+        "p_wilcoxon": 0.125,
+        "mde": 0.38307901997701044,
+        "p_holm": 1.0
+      },
+      "P06": {
+        "n_paths": 4,
+        "mean_diff": 0.48449736876079763,
+        "ci_lo": 0.32125109636615945,
+        "ci_hi": 0.6839404267519333,
+        "se": 0.10376453573703963,
+        "p_wilcoxon": 0.125,
+        "mde": 0.43175578859974695,
+        "p_holm": 1.0
+      },
+      "P07": {
+        "n_paths": 4,
+        "mean_diff": 0.9440754540011757,
+        "ci_lo": 0.8317631070920545,
+        "ci_hi": 1.0865706605222736,
+        "se": 0.07353462683122636,
+        "p_wilcoxon": 0.125,
+        "mde": 0.30597159782377525,
+        "p_holm": 1.0
+      }
+    },
+    "spread_sd_of_profile_minus_C0": 0.32161971107818516,
+    "n_significant_holm": 0
+  },
+  "manipulation_check": {
+    "n_paths": 4,
+    "mean_diff": 1.1291521764381502,
+    "ci_lo": 0.8901256352343309,
+    "ci_hi": 1.4117099790474406,
+    "se": 0.15504321624295958,
+    "p_wilcoxon": 0.0625,
+    "mde": 0.6451222050052022,
+    "hypothesis": "DE(C1) > DE(C0), one-sided"
+  },
+  "C0_vs_profiles_pooled_DE": {
+    "C0": -0.4005376344086022,
+    "profiles": 0.3800784155796688
+  },
+  "rq2_sameness": {
+    "all periods": {
+      "profile_pairs_identical": 0.33746031746031746,
+      "profile_pairs": 6300,
+      "C0_C1_identical": 0.56,
+      "C0_C1_pairs": 225
+    },
+    "period 1": {
+      "profile_pairs_identical": 0.44285714285714284,
+      "profile_pairs": 420,
+      "C0_C1_identical": 0.0,
+      "C0_C1_pairs": 15
+    }
+  },
+  "rq3_tags": null,
+  "n_runs": 150,
+  "n_decision_rows": 3239,
+  "regression_model": "attribute terms NOT IDENTIFIED with 8 profiles (11 attributes + constant); fitted with profile fixed effects and gain x memory terms only. Attribute effects need the main run."
+}

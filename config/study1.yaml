@@ -31,9 +31,10 @@ llm:
   # model missing here stops before any call. An entry may override service_tier.
   model_prices:
     gpt-6-luna: {input: 0.05, cached_input: 0.05, output: 0.25}
-    # UNCONFIRMED: Standard-tier list price from third-party trackers (Nov 2026); they report
-    # no Flex tier for gpt-6.2-sol. Confirm on the OpenAI pricing page before the Sol pilot.
-    gpt-6.2-sol: {input: 2.00, cached_input: 0.10, output: 10.00}
+    # Standard-tier list price from third-party trackers (Nov 2026), unconfirmed. The API
+    # rejects service_tier=flex for this model (HTTP 400, 2026-11-27), so it runs on the
+    # standard tier ("default").
+    gpt-6.2-sol: {input: 2.00, cached_input: 0.10, output: 10.00, service_tier: default}
 
 budget:
   # Prototype 2 alone (fresh cache): hard stop for everything in cache/study1/, cumulative
@@ -78,7 +79,7 @@ portfolio:
 
 stages:
   pilot: {profiles: 8, scenarios: 5}      # (8 + C0 + C1) x 5 x 3 = 150 runs, once per model
-  full: {profiles: 30, scenarios: 15}     # 1,440 runs; set from the power analysis (§2.5)
+  full: {profiles: 40, scenarios: 20}     # 2,520 runs; power-study1 on the Luna pilot (largest affordable)
 
 calibration:
   tej_path: data/raw/tej/fulldata_1995to1999.csv   # licensed, git-ignored
@@ -100,6 +101,10 @@ power:
   n_sims: 500
   delta: 0.05             # effect of every attribute (and memory arm) on PGR - PLR
   blind_spot_band: 0.03
+  # Residual sd of the gain gap across profiles beyond additive attribute effects
+  # (attribute interactions). Not estimable from 8 pilot profiles: an assumption. Sensitivity:
+  # power-study1 <pilot> --residual-sd 0 / 0.2
+  profile_residual_sd: 0.1
   seed: 7
 
 run:

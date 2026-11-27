@@ -1,6 +1,6 @@
 """Load secrets from a local, git-ignored `.env` file at the project root.
 
-    cp .env.example .env        # then put your key in .env
+    echo 'OPENAI_API_KEY=sk-...' > .env
     chmod 600 .env
 
 Format: `KEY=value` per line; blank lines, `# comments`, an optional `export ` prefix and
@@ -59,5 +59,5 @@ def require_api_key() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         raise SystemExit(
             "OPENAI_API_KEY is not set. Put it in the git-ignored file "
-            f"{ENV_FILE} (copy .env.example), or `export OPENAI_API_KEY=...`. "
+            f"{ENV_FILE} (one line: OPENAI_API_KEY=sk-...), or `export OPENAI_API_KEY=...`. "
             "Free alternatives that need no key: --dry-run, --replay, --backend dummy.")

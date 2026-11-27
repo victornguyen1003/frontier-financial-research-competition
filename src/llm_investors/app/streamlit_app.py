@@ -635,7 +635,64 @@ elif page == "Data analysis":
         st.dataframe(pd.DataFrame(sm).T, hide_index=False)
         st.caption("If profile pairs are about as identical as C0 vs C1, the persona text "
                    "barely changes decisions.")
-    with st.expander("Full regression table"):
+    st.subheader("Regression (§5.2): every term")
+    reg = table(name, "analysis/regression")
+    if reg is not None and not reg.empty:
+        st.caption(t.get("regression_model", ""))
+        est = reg[reg["status"] == "estimated"].drop(columns="status")
+        st.dataframe(est.round(4), hide_index=True)
+        left = reg[reg["status"] != "estimated"][["term", "status"]]
+        if not left.empty:
+            st.markdown(f"**Not in the fitted model ({len(left)} terms)**")
+            st.dataframe(left.assign(status=left["status"].str.replace("omitted: ", "")),
+                         hide_index=True)
+    else:
+        st.caption("Regression not estimable for this dataset (e.g. C0/C1 only).")
+
+    st.subheader("Raw DE difference")
+    raw = table(name, "analysis/attribute_de")
+    if raw is not None and not raw.empty:
+        st.dataframe(raw[["label", "raw_DE_diff", "raw_lo", "raw_hi"]].round(4)
+                     .rename(columns={"raw_DE_diff": "DE level 1 − level 0",
+                                      "raw_lo": "95% CI low", "raw_hi": "95% CI high"}),
+                     hide_index=True)
+        if t.get("regression_model") != "full §5.2 model":
+            st.caption("With this few profiles, attributes that are on together cannot be "
+                       "separated: descriptive only.")
+    else:
+        st.caption("No profiles in this dataset.")
+
+    st.subheader("DE by variable")
+    dv = table(name, "analysis/de_by_variable")
+    if dv is not None and not dv.empty:
+        import altair as alt
+        labels = dv.drop_duplicates("variable").set_index("variable")["label"].to_dict()
+        default = [v for v in ("persona_type", "memory") if v in labels]
+        pick = st.multiselect("Variables", list(labels), default=default,
+                              format_func=lambda v: labels[v])
+        d = dv[dv["variable"].isin(pick)].copy()
+        if d.empty:
+            st.caption("Choose one or more variables.")
+        else:
+            base = alt.Chart(d).encode(
+                x=alt.X("level:N", title=None, sort=alt.SortField("order")),
+                tooltip=["label", "level", "runs", alt.Tooltip("PGR:Q", format=".3f"),
+                         alt.Tooltip("PLR:Q", format=".3f"), alt.Tooltip("DE:Q", format=".3f"),
+                         alt.Tooltip("DE_lo:Q", format=".3f"),
+                         alt.Tooltip("DE_hi:Q", format=".3f")])
+            bars = base.mark_bar(color="#2a78d6").encode(
+                y=alt.Y("DE:Q", title="DE = PGR − PLR"))
+            err = base.mark_rule(color="#52514e").encode(y="DE_lo:Q", y2="DE_hi:Q")
+            zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="#52514e").encode(y="y:Q")
+            chart = (bars + err + zero).properties(width=170, height=260).facet(
+                column=alt.Column("label:N", title=None, header=alt.Header(labelFontSize=12)))
+            st.altair_chart(chart.resolve_scale(x="independent"))
+            st.caption("Pooled PGR − PLR at each level with 95% path-bootstrap intervals "
+                       "(hover for PGR, PLR and run counts). Attributes and memory use the "
+                       "sampled profiles only.")
+    else:
+        st.caption(f"Re-run analyze-study1 {name} to build this chart.")
+    with st.expander("Plain-text version (regression.txt)"):
         p = an / "regression.txt"
         st.code(p.read_text() if p.exists() else "", language=None)
 

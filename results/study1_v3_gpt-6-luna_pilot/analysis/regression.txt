@@ -1,0 +1,65 @@
+Model: attribute terms NOT IDENTIFIED with 8 profiles (11 attributes + constant); fitted with profile fixed effects and gain x memory terms only. Attribute effects need the main run.
+Decision-level LPM (plan §5.2), profiles only; SEs two-way clustered by path and profile; t with 4 df.
+sold ~ gain + profile FE + mem_m + gain:mem_m + ret + holding_period + drawdown
+N = 2898, paths = 5, profiles = 8
+
+d_k (gain:attr_k) and f_m (gain:mem_m) are the change in P(sell|gain) − P(sell|loss), the regression counterpart of PGR − PLR. Every term is listed; terms not in the fitted model are shown with the reason.
+
+TABLE 1. Regression
+                         term    coef      se       p   ci_lo   ci_hi                                                                 status
+                        const  0.0784  0.0657   0.299 -0.1041  0.2609                                                              estimated
+                         gain  0.2425  0.1347  0.1462 -0.1315  0.6165                                                              estimated
+                  profile_P01  0.0026  0.0395  0.9506 -0.1071  0.1124                                                              estimated
+                  profile_P02  0.2252  0.0213  0.0004  0.1661  0.2842                                                              estimated
+                  profile_P03  0.0775  0.0343  0.0866 -0.0177  0.1727                                                              estimated
+                  profile_P04  0.0271  0.0204  0.2554 -0.0296  0.0838                                                              estimated
+                  profile_P05  0.1246  0.0179  0.0022  0.0749  0.1742                                                              estimated
+                  profile_P06  0.0441  0.0214  0.1084 -0.0153  0.1036                                                              estimated
+                  profile_P07  0.1064  0.0237  0.0109  0.0407  0.1721                                                              estimated
+                      mem_log -0.0494   0.039  0.2746 -0.1577   0.059                                                              estimated
+                 gain:mem_log  0.0906  0.0444  0.1112 -0.0328   0.214                                                              estimated
+                  mem_reflect  0.0299  0.0258  0.3113 -0.0418  0.1016                                                              estimated
+             gain:mem_reflect -0.1138  0.0588  0.1251 -0.2772  0.0495                                                              estimated
+                          ret  0.3426  0.1279  0.0553 -0.0125  0.6977                                                              estimated
+               holding_period -0.0008  0.0078  0.9238 -0.0226   0.021                                                              estimated
+                     drawdown  -1.844  0.3999  0.0099 -2.9543 -0.7338                                                              estimated
+        attr_loss_sensitivity                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+       attr_mental_accounting                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+         attr_regret_aversion                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+     attr_realization_utility                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+      attr_financial_literacy                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+              attr_experience                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+            attr_professional                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+                     attr_age                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+                  attr_gender                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+        attr_market_knowledge                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+        attr_trading_activity                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+   gain:attr_loss_sensitivity                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+  gain:attr_mental_accounting                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+    gain:attr_regret_aversion                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_realization_utility                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+ gain:attr_financial_literacy                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+         gain:attr_experience                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+       gain:attr_professional                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+                gain:attr_age                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+             gain:attr_gender                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+   gain:attr_market_knowledge                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+   gain:attr_trading_activity                                         not identified with 8 profiles (absorbed by the profile fixed effects)
+                  profile_P00                                                                          reference profile (absorbed in const)
+
+TABLE 2. Raw DE difference (pooled PGR − PLR, level 1 minus level 0; memory: arm minus none), 95% path-bootstrap CI
+CAUTION: with this few profiles attributes that are on together cannot be separated; read these as descriptive only.
+                    label raw_DE_diff  raw_lo  raw_hi
+         Loss sensitivity     -0.2767 -0.3599 -0.2122
+        Mental accounting      0.4263  0.3064  0.5555
+          Regret aversion      0.3461  0.1943  0.4878
+      Realization utility     -0.3027 -0.4875 -0.1202
+       Financial literacy     -0.5997 -0.6896 -0.5102
+               Experience      0.3129  0.2084  0.4347
+             Professional     -0.5168 -0.6636 -0.3494
+              Age (older)      0.0523 -0.0078  0.1096
+           Gender (woman)       0.328  0.1849  0.4629
+         Market knowledge      0.3882  0.2153  0.5457
+Trading activity (active)     -0.0463  -0.216  0.0473
+               log - none      0.1063  0.0471  0.1863
+           reflect - none     -0.0971 -0.2168  0.0293

@@ -44,10 +44,14 @@ def fit_pilot(runs: pd.DataFrame, dec: pd.DataFrame) -> dict:
     d["gain"] = d["gain"].astype(int)
     d["sold"] = d["sell"].astype(int)
     c0 = d[d["persona"] == "C0"]
-    base = d if c0.empty else c0
+    prof = d[d["persona_kind"] == "profile"]
+    # Simulated profiles start from the sampled profiles' average sell rates: the regression
+    # covers profiles only, and C0 (few sales, reverse DE) is not representative of them.
+    base = prof if not prof.empty else d
     rate_gain = float(base.loc[base["gain"] == 1, "sold"].mean())
     rate_loss = float(base.loc[base["gain"] == 0, "sold"].mean())
-    fitd = d[d["persona_kind"] != "C1"].copy()
+    c0g = c0 if not c0.empty else base
+    fitd = (prof if not prof.empty else d).copy()
     fitd["path"] = fitd["scenario"].astype(str)
     for m in MEMS:
         fitd[f"mem_{m}"] = (fitd["architecture"] == m).astype(float)
@@ -74,11 +78,13 @@ def fit_pilot(runs: pd.DataFrame, dec: pd.DataFrame) -> dict:
     # C1 - C0 difference in the gain gap (for the manipulation-check power)
     c1 = d[d["persona"] == "C1"]
     gap = lambda x: x.loc[x["gain"] == 1, "sold"].mean() - x.loc[x["gain"] == 0, "sold"].mean()
-    c1_effect = float(gap(c1) - gap(base)) if not c1.empty and not c0.empty else None
+    c1_effect = float(gap(c1) - gap(c0g)) if not c1.empty and not c0.empty else None
     sale_days = runs["sale_days"] if "sale_days" in runs else \
         dec.groupby("run_id")["period"].nunique()
     blocks = d.groupby(["run_id", "period"]).size()
-    return {"c0_sell_rate_gain": rate_gain, "c0_sell_rate_loss": rate_loss,
+    return {"base_sell_rate_gain": rate_gain, "base_sell_rate_loss": rate_loss,
+            "c0_sell_rate_gain": float(c0g.loc[c0g["gain"] == 1, "sold"].mean()),
+            "c0_sell_rate_loss": float(c0g.loc[c0g["gain"] == 0, "sold"].mean()),
             "variance_components": comps, "variance_method": method,
             "mixedlm_crosscheck": check,
             "mean_sale_days_per_run": float(sale_days.mean()),
@@ -122,8 +128,8 @@ def simulate(P: int, S: int, fitp: dict, blocks: dict, profiles, delta: float, r
     vc = fitp["variance_components"]
     sd = {k: np.sqrt(vc.get(k, 0.0)) for k in ("path", "path_gain", "profile")}
     sd["profile_gain"] = np.sqrt(fitp["profile_gain_residual"])
-    a = fitp["c0_sell_rate_loss"]
-    b = fitp["c0_sell_rate_gain"] - a
+    a = fitp.get("base_sell_rate_loss", fitp["c0_sell_rate_loss"])
+    b = fitp.get("base_sell_rate_gain", fitp["c0_sell_rate_gain"]) - a
     c1 = fitp["c1_minus_c0_gain_gap"]
     c1 = c1 if c1 is not None and c1 > 0 else delta
     attrs = np.array([[pr[k] for k in ATTRIBUTE_KEYS] for pr in profiles]
@@ -256,20 +262,25 @@ def fig_power(pw: pd.DataFrame, mdes: pd.DataFrame, rec: dict, path):
     plt.close(fig)
 
 
-def main(name: str, n_sims: int | None = None, quick: bool = False):
+def main(name: str, n_sims: int | None = None, quick: bool = False,
+         residual_sd: float | None = None):
     cfg = load_config("study1")
     pc = cfg["power"]
     runs, dec, _, _ = load(name)
     if dec.empty:
         raise SystemExit(f"{name}: no decision rows (no sales in the pilot?)")
     fitp = fit_pilot(runs, dec)
-    # The pilot's profiles cannot separate attribute effects from other profile-level
-    # differences in the gain gap. The simulation adds attribute effects of size delta, whose
-    # variance across balanced profiles is n_attr * delta^2 / 4; only the rest is residual.
-    attr_var = len(ATTRIBUTE_KEYS) * pc["delta"] ** 2 / 4
-    fitp["profile_gain_attribute_part"] = attr_var
-    fitp["profile_gain_residual"] = max(0.0, fitp["variance_components"]["profile_gain"]
-                                        - attr_var)
+    # Residual profile heterogeneity in the gain gap: differences between profiles that the
+    # additive attribute terms do not capture (attribute interactions). The pilot cannot
+    # estimate it: 8 profiles against 11 attributes + a constant is saturated, so the whole
+    # between-profile variance could be attribute effects. It is therefore an assumption
+    # (power.profile_residual_sd), reported with the total pilot profile variance for scale.
+    primary = residual_sd is None
+    rsd = float(pc.get("profile_residual_sd", 0.1) if residual_sd is None else residual_sd)
+    fitp["profile_gain_residual"] = rsd ** 2
+    fitp["profile_residual_sd_assumed"] = rsd
+    fitp["profile_gain_sd_total_pilot"] = float(
+        np.sqrt(fitp["variance_components"]["profile_gain"]))
     blocks = _blocks(dec[dec["persona_kind"] != "C1"])
     n_sims = n_sims or pc["n_sims"]
     Ps, Ss = pc["profiles"], pc["scenarios"]
@@ -317,16 +328,25 @@ def main(name: str, n_sims: int | None = None, quick: bool = False):
             "cost_per_run_usd": cpr, "mde_dk_holm": float(
                 mdes.set_index(["P", "S"]).loc[(rec["P"], rec["S"]), "mde_dk_holm"])}
     out = ROOT / "results" / name / "power"
+    if not primary:
+        out = out / f"residual_sd_{rsd:g}"
     out.mkdir(parents=True, exist_ok=True)
     pw.to_csv(out / "power.csv", index=False)
     mdes.merge(cost, on=["P", "S"]).to_csv(out / "mde.csv", index=False)
     (out / "recommendation.json").write_text(json.dumps(rec, indent=2, default=float))
     fig_power(pw, mdes, rec, out / "power_curves.png")
+    print(f"(assumed residual profile sd {rsd:g}; total pilot profile sd of the gain gap "
+          f"{fitp['profile_gain_sd_total_pilot']:.3f})")
     print(f"\nRecommendation: P = {rec['P']}, S = {rec['S']} ({rec['reason']}); "
           f"{rec['runs']} runs" + (f" ≈ ${rec['projected_cost_usd']:.2f}"
                                    if rec["projected_cost_usd"] else "")
           + f"; MDE {rec['mde_dk_holm']:.3f}")
     print(f"-> {out}")
+    from llm_investors.notify import notify
+    notify(f"Power {name} finished (residual sd {rsd:g})",
+           f"Recommended P = {rec['P']}, S = {rec['S']} ({rec['runs']} runs"
+           + (f", ≈ ${rec['projected_cost_usd']:.2f}" if rec["projected_cost_usd"] else "")
+           + f"); MDE {rec['mde_dk_holm']:.3f}. {rec['reason']}", tags="bar_chart")
 
 
 def cli():
@@ -334,8 +354,11 @@ def cli():
     ap.add_argument("dataset", help="pilot dataset, e.g. study1_v3_gpt-6-luna_pilot")
     ap.add_argument("--sims", type=int, help="override power.n_sims")
     ap.add_argument("--quick", action="store_true", help="2 x 2 designs (pipeline check)")
+    ap.add_argument("--residual-sd", type=float,
+                    help="sensitivity run: assumed residual profile sd (default "
+                         "power.profile_residual_sd); writes to power/residual_sd_<x>/")
     a = ap.parse_args()
-    main(a.dataset, a.sims, a.quick)
+    main(a.dataset, a.sims, a.quick, a.residual_sd)
 
 
 if __name__ == "__main__":

@@ -256,6 +256,12 @@ def main(name: str, backend: str | None = None, dry_run: bool = False, yes: bool
           + (f"; {len(errors)} problems, e.g. {errors[0]}" if errors else ""))
     print(tags[[f"tag_{t}" for t in TAGS]].mean().round(3).to_string())
     validation(out_dir, tags, cfg0["tagging"]["validation_sample"])
+    if real:
+        from llm_investors.notify import notify
+        notify(f"Tagging {name} finished",
+               f"tagged {len(labels):,}/{len(texts):,} unique texts; spent "
+               f"${s['spent_usd']:.3f}" + (f"; {len(errors)} problems" if errors else ""),
+               tags="label" if not errors else "warning")
     print(f"-> {out_dir / 'reasoning_tags.csv'}  (re-run analyze-study1 {name} to use them)")
 
 

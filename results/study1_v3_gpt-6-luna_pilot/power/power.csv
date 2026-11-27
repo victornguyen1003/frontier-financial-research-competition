@@ -1,0 +1,46 @@
+P,S,test,power,n_sims
+20,10,"d_k (Holm, min over k)",0.112,500
+20,10,"d_k (Holm, mean over k)",0.1370909090909091,500
+20,10,joint Wald d_k = 0,0.976,500
+20,10,memory Wald,0.57,500
+20,10,C1 vs C0,0.992,500
+20,15,"d_k (Holm, min over k)",0.13,500
+20,15,"d_k (Holm, mean over k)",0.17145454545454544,500
+20,15,joint Wald d_k = 0,0.988,500
+20,15,memory Wald,0.808,500
+20,15,C1 vs C0,0.992,500
+20,20,"d_k (Holm, min over k)",0.142,500
+20,20,"d_k (Holm, mean over k)",0.17599999999999996,500
+20,20,joint Wald d_k = 0,0.982,500
+20,20,memory Wald,0.946,500
+20,20,C1 vs C0,0.996,500
+30,10,"d_k (Holm, min over k)",0.07,500
+30,10,"d_k (Holm, mean over k)",0.09436363636363637,500
+30,10,joint Wald d_k = 0,0.974,500
+30,10,memory Wald,0.816,500
+30,10,C1 vs C0,0.998,500
+30,15,"d_k (Holm, min over k)",0.094,500
+30,15,"d_k (Holm, mean over k)",0.11945454545454547,500
+30,15,joint Wald d_k = 0,0.99,500
+30,15,memory Wald,0.96,500
+30,15,C1 vs C0,0.998,500
+30,20,"d_k (Holm, min over k)",0.118,500
+30,20,"d_k (Holm, mean over k)",0.14945454545454542,500
+30,20,joint Wald d_k = 0,0.992,500
+30,20,memory Wald,0.986,500
+30,20,C1 vs C0,0.998,500
+40,10,"d_k (Holm, min over k)",0.058,500
+40,10,"d_k (Holm, mean over k)",0.07290909090909092,500
+40,10,joint Wald d_k = 0,0.97,500
+40,10,memory Wald,0.914,500
+40,10,C1 vs C0,0.988,500
+40,15,"d_k (Holm, min over k)",0.088,500
+40,15,"d_k (Holm, mean over k)",0.11309090909090912,500
+40,15,joint Wald d_k = 0,0.992,500
+40,15,memory Wald,0.988,500
+40,15,C1 vs C0,0.996,500
+40,20,"d_k (Holm, min over k)",0.082,500
+40,20,"d_k (Holm, mean over k)",0.13672727272727273,500
+40,20,joint Wald d_k = 0,0.996,500
+40,20,memory Wald,1.0,500
+40,20,C1 vs C0,0.998,500

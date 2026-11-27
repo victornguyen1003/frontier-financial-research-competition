@@ -1,0 +1,51 @@
+{
+  "P": 40,
+  "S": 15,
+  "reason": "cheapest design with >= 80% power for every d_k within the main-run budget",
+  "runs": 1890,
+  "projected_cost_usd": 4.51905174,
+  "budget_usd": 6.5,
+  "power": {
+    "d_k (Holm, min over k)": 0.845,
+    "d_k (Holm, mean over k)": 0.8927272727272727,
+    "joint Wald d_k = 0": 1.0,
+    "memory Wald": 0.995,
+    "C1 vs C0": 1.0
+  },
+  "pilot": "study1_v3_gpt-6-luna_pilot",
+  "pilot_fit": {
+    "base_sell_rate_gain": 0.5228325612177366,
+    "base_sell_rate_loss": 0.14275414563806776,
+    "c0_sell_rate_gain": 0.08333333333333333,
+    "c0_sell_rate_loss": 0.4838709677419355,
+    "variance_components": {
+      "path": 0.0031268686195978735,
+      "path_gain": 0.004342015662017317,
+      "profile": 0.01373160995336639,
+      "profile_gain": 0.08013892152845432,
+      "within_run": 0.18871141035611
+    },
+    "variance_method": "ANOVA moments: between-path / between-profile variance of the loss sell rate and of the gain gap, net of binomial sampling variance",
+    "mixedlm_crosscheck": {
+      "converged": false,
+      "within_run": 0.1673582425692763,
+      "path": 0.004865253347922144,
+      "path_gain": 0.002750034231644928,
+      "profile": 0.0130175570549686,
+      "profile_gain": 0.06395312447389381
+    },
+    "mean_sale_days_per_run": 5.266666666666667,
+    "mean_positions_per_sale_day": 4.1,
+    "share_gain_rows": 0.5208397653596789,
+    "c1_minus_c0_gain_gap": 1.0567210032785384,
+    "n_rows": 3239,
+    "n_runs": 150,
+    "profile_gain_residual": 0.0,
+    "profile_residual_sd_assumed": 0.0,
+    "profile_gain_sd_total_pilot": 0.2830881868401688
+  },
+  "delta": 0.05,
+  "n_sims": 200,
+  "cost_per_run_usd": 0.0023910326666666667,
+  "mde_dk_holm": 0.04743782860859553
+}

@@ -1,0 +1,40 @@
+term,coef,se,p,ci_lo,ci_hi,status
+const,0.07839161414186613,0.0657419448948363,0.29900016367106796,-0.10413728696758517,0.26092051525131743,estimated
+gain,0.24247948670071473,0.13470960891663158,0.14623561402431248,-0.1315343475989761,0.6164933210004055,estimated
+profile_P01,0.0026081164239468713,0.039527911081539385,0.950558602064249,-0.10713895881708677,0.11235519166498051,estimated
+profile_P02,0.22516477943990987,0.021261439003834034,0.00044992058607326265,0.16613356118825343,0.28419599769156634,estimated
+profile_P03,0.07749940657160836,0.03427543985878985,0.08657728051064867,-0.017664470652830055,0.17266328379604678,estimated
+profile_P04,0.027074007654223742,0.020415472239862297,0.25544518829248175,-0.029608430316443363,0.08375644562489085,estimated
+profile_P05,0.12456636069088756,0.017881954449433357,0.0022324395991165564,0.0749180957883884,0.1742146255933867,estimated
+profile_P06,0.044128748100074056,0.021418190973662977,0.1084107727468749,-0.01533768339094408,0.10359517959109218,estimated
+profile_P07,0.10642475885119262,0.02367209226745763,0.010857508647144328,0.04070049414541935,0.1721490235569659,estimated
+mem_log,-0.04935855464706762,0.03901987084949638,0.2745609791642607,-0.1576950840726019,0.05897797477846667,estimated
+gain:mem_log,0.09057117488023803,0.044444424351720746,0.11121483643855906,-0.032826329564430656,0.2139686793249067,estimated
+mem_reflect,0.029906228208396612,0.025823551725392406,0.31126065636401323,-0.041791445578391165,0.10160390199518439,estimated
+gain:mem_reflect,-0.11381915759885697,0.058832254382313286,0.1251460962451578,-0.2771636823063821,0.04952536710866817,estimated
+ret,0.3426440005794226,0.12789756012491213,0.05528312220407606,-0.01245655419613012,0.6977445553549754,estimated
+holding_period,-0.0007991541027399032,0.007847840838865933,0.9237912339744495,-0.02258825338618057,0.020989945180700763,estimated
+drawdown,-1.8440285597574615,0.39988687278985313,0.009945356312188703,-2.954292510347702,-0.733764609167221,estimated
+attr_loss_sensitivity,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_mental_accounting,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_regret_aversion,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_realization_utility,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_financial_literacy,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_experience,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_professional,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_age,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_gender,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_market_knowledge,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+attr_trading_activity,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_loss_sensitivity,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_mental_accounting,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_regret_aversion,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_realization_utility,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_financial_literacy,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_experience,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_professional,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_age,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_gender,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_market_knowledge,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+gain:attr_trading_activity,,,,,,omitted: not identified with 8 profiles (absorbed by the profile fixed effects)
+profile_P00,,,,,,reference profile (absorbed in const)

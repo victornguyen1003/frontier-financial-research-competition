@@ -17,13 +17,18 @@ attribute's effect on the disposition effect (DE = PGR − PLR) and compares wit
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt  # pinned versions used for the runs
 pip install -e .                 # installs the llm_investors package and the commands below
-cp .env.example .env && chmod 600 .env   # then put your key in .env (only needed for paid runs)
+echo 'OPENAI_API_KEY=sk-...' > .env && chmod 600 .env   # your key (only needed for paid runs)
 pytest -q                        # no API calls
 ```
 
 The OpenAI key goes in `.env` at the repository root (`OPENAI_API_KEY=sk-...`). `.env` is
 git-ignored, a key exported in the shell wins, and `--dry-run`, `--replay` and
 `--backend dummy` never need a key. Also set a spend limit in the OpenAI dashboard.
+
+**Phone notifications (optional):** add `NTFY_TOPIC=<your topic>` to `.env` and subscribe to that
+topic in the ntfy app. `run-study1` (real runs only, not dummy or dry runs), `power-study1`
+and paid `tag-reasoning` then post a summary when they finish or stop. The topic stays in
+`.env` because anyone who knows an ntfy topic name can read it.
 
 ## Input data
 
@@ -101,11 +106,13 @@ third-party list prices.
   only; attribute effects come from the main run.
 - **Two-way clustering** (path, profile) follows Cameron, Gelbach & Miller; tests use t / F
   with (smaller number of clusters − 1) degrees of freedom.
-- **Power analysis:** variance components come from the ANOVA (moments) method. Crossed
-  MixedLM is kept as a recorded cross-check only, because on pilot-sized data it reported
-  convergence with implausible components. The simulated profile residual is the pilot's
-  profile variance in the gain gap minus the part δ-sized attribute effects explain
-  (11·δ²/4).
+- **Power analysis:** simulated profiles start from the sampled profiles' sell rates, not
+  C0's: C0 barely trades and has a reverse DE. Variance components come from the ANOVA
+  (moments) method, with MixedLM recorded only as a cross-check, because on pilot-sized data it
+  reported implausible components. The residual profile heterogeneity beyond additive
+  attribute effects cannot be estimated from 8 profiles, so it is an assumption
+  (`power.profile_residual_sd: 0.1`), with sensitivity runs at 0 and 0.2
+  (`--residual-sd`, written to `power/residual_sd_<x>/`).
 - **`reflect` = record + lessons** in v3, so before the first reflection `reflect` and `log` send
   identical prompts and share one cached draw (common random numbers), like `none` and `log`
   in month 1.

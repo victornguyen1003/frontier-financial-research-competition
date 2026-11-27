@@ -143,16 +143,21 @@ def regression_sample(dec: pd.DataFrame) -> pd.DataFrame:
 
 
 def regression(dec: pd.DataFrame):
-    """Returns (fit, sample, note). With fewer distinct profiles than attribute parameters
-    (e.g. the pilot's 8 profiles against 11 attributes + a constant), the attribute terms are
-    not identified; the model then uses profile fixed effects instead of attr_k and drops the
-    gain x attr_k terms, so the memory terms can still be estimated."""
+    """Returns (fit, sample, note, omitted). `omitted` lists every §5.2 term that is not in the
+    fitted model, with the reason, so the regression table can show it.
+
+    With fewer distinct profiles than attribute parameters (e.g. the pilot's 8 profiles
+    against 11 attributes + a constant), the attribute terms are not identified; the model then
+    uses profile fixed effects instead of attr_k and drops the gain x attr_k terms, so the
+    memory terms can still be estimated."""
     d = regression_sample(dec)
     if d.empty or d["persona"].nunique() < 2 or d["scenario"].nunique() < 2:
-        return None, d, "not estimable (needs at least 2 profiles and 2 paths with sales)"
+        return None, d, "not estimable (needs at least 2 profiles and 2 paths with sales)", []
     X, names = design_matrix(d)
     keep = X.std(axis=0) > 0
     keep[0] = True
+    omitted = [(n, "omitted: no variation in the sample") for n, k in zip(names, keep) if not k]
+    full_names = names
     X, names = X[:, keep], [n for n, k in zip(names, keep) if k]
     note = "full §5.2 model"
     if np.linalg.matrix_rank(X) < X.shape[1]:
@@ -170,15 +175,30 @@ def regression(dec: pd.DataFrame):
         note = (f"attribute terms NOT IDENTIFIED with {d['persona'].nunique()} profiles "
                 f"({len(ATTRIBUTE_KEYS)} attributes + constant); fitted with profile fixed "
                 "effects and gain x memory terms only. Attribute effects need the main run.")
+        why = (f"omitted: not identified with {d['persona'].nunique()} profiles "
+               "(absorbed by the profile fixed effects)")
+        omitted = [(n, why) for n in full_names if n.startswith(("attr_", "gain:attr_"))]
+        omitted.append((f"profile_{sorted(d['persona'].unique())[0]}",
+                        "reference profile (absorbed in const)"))
     fit = ols(d["sold"].to_numpy(float), X, names,
               [d["scenario"].to_numpy(), d["persona"].to_numpy()])
-    return fit, d, note
+    return fit, d, note, omitted
 
 
-def coef_table(fit) -> pd.DataFrame:
+def table_text(t: pd.DataFrame) -> str:
+    """Plain-text table with blanks instead of NaN."""
+    return t.round(4).astype(object).where(t.notna(), "").to_string(index=False)
+
+
+def coef_table(fit, omitted=()) -> pd.DataFrame:
+    """Every estimated term, then every §5.2 term left out of the fit (with the reason)."""
     lo, hi = fit.ci()
-    return pd.DataFrame({"term": fit.names, "coef": fit.beta, "se": fit.se, "p": fit.pvalues(),
-                         "ci_lo": lo, "ci_hi": hi})
+    t = pd.DataFrame({"term": fit.names, "coef": fit.beta, "se": fit.se, "p": fit.pvalues(),
+                      "ci_lo": lo, "ci_hi": hi, "status": "estimated"})
+    if omitted:
+        t = pd.concat([t, pd.DataFrame([{"term": n, "status": why} for n, why in omitted])],
+                      ignore_index=True)
+    return t
 
 
 def attribute_de(runs: pd.DataFrame, seed: int = 0) -> pd.DataFrame:
@@ -216,6 +236,48 @@ def attribute_de(runs: pd.DataFrame, seed: int = 0) -> pd.DataFrame:
         e, lo, hi = contrast(prof[prof["architecture"] == m], prof[prof["architecture"] == "none"])
         rows.append({"term": f"gain:mem_{m}", "label": f"{m} - none", "raw_DE_diff": e,
                      "raw_lo": lo, "raw_hi": hi})
+    return pd.DataFrame(rows)
+
+
+def de_by_variable(runs: pd.DataFrame, seed: int = 0) -> pd.DataFrame:
+    """Pooled PGR, PLR and DE at each level of each variable, with 95% path-bootstrap CIs:
+    the 11 attributes (profiles only, level 0 and 1), the memory arm (profiles only) and the
+    persona type (C0, C1, profiles). One row per variable x level, for the selectable chart."""
+    rng = np.random.default_rng(seed)
+    if runs.empty:
+        return pd.DataFrame()
+    scen = np.sort(runs["scenario"].unique())
+    idx = rng.integers(0, len(scen), (B, len(scen)))
+    prof = runs[runs["persona_kind"] == "profile"]
+    rows = []
+
+    def add(var, label, level, g, order):
+        per = g.groupby("scenario")[CNT].sum().reindex(scen, fill_value=0).to_numpy()
+        est = _ratios(per.sum(0))
+        bs = per[idx].sum(1)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            de = bs[:, 0] / (bs[:, 0] + bs[:, 2]) - bs[:, 1] / (bs[:, 1] + bs[:, 3])
+        de = de[np.isfinite(de)]
+        lo, hi = np.percentile(de, [2.5, 97.5]) if len(de) else (np.nan, np.nan)
+        rows.append({"variable": var, "label": label, "level": level, "order": order,
+                     "runs": len(g), "PGR": est["PGR"], "PLR": est["PLR"], "DE": est["DE"],
+                     "DE_lo": lo, "DE_hi": hi})
+
+    for k in ATTRIBUTE_KEYS:
+        c = f"attr_{k}"
+        if c in prof:
+            for lvl in (0, 1):
+                g = prof[prof[c] == lvl]
+                if not g.empty:
+                    add(k, LABELS[k], f"level {lvl}", g, lvl)
+    for i, a in enumerate(ARCHS):
+        g = prof[prof["architecture"] == a]
+        if not g.empty:
+            add("memory", "Memory arm (profiles)", a, g, i)
+    for i, (lvl, g) in enumerate((("C0", runs[runs["persona"] == "C0"]),
+                                  ("C1", runs[runs["persona"] == "C1"]), ("profiles", prof))):
+        if not g.empty:
+            add("persona_type", "Persona type", lvl, g, i)
     return pd.DataFrame(rows)
 
 
@@ -554,15 +616,14 @@ def main(name: str):
         old.unlink()                      # figures of an earlier run must not linger
     cells = cell_table(runs)
     cells.to_csv(out / "cells.csv", index=False)
-    fit, sample, reg_note = regression(dec) if not dec.empty else (None, dec, "no decisions")
+    fit, sample, reg_note, omitted = regression(dec) if not dec.empty else \
+        (None, dec, "no decisions", [])
     raw = attribute_de(runs)
     raw.to_csv(out / "attribute_de.csv", index=False)
+    de_by_variable(runs).to_csv(out / "de_by_variable.csv", index=False)
     if fit is not None:
-        tbl = coef_table(fit)
-        if not raw.empty:
-            tbl = tbl.merge(raw, on="term", how="left")
+        tbl = coef_table(fit, omitted)
         tbl.to_csv(out / "regression.csv", index=False)
-        tbl = tbl[~tbl["term"].str.startswith("profile_")]
         text = (f"Model: {reg_note}\n"
                 "Decision-level LPM (plan §5.2), profiles only; SEs two-way clustered by path "
                 f"and profile; t with {fit.dof} df.\n"
@@ -573,9 +634,18 @@ def main(name: str):
                 + f"N = {fit.n}, paths = {sample['scenario'].nunique()}, profiles = "
                 f"{sample['persona'].nunique()}\n\n"
                 "d_k (gain:attr_k) and f_m (gain:mem_m) are the change in P(sell|gain) − "
-                "P(sell|loss), the regression counterpart of PGR − PLR; raw_DE_diff is the "
-                "pooled PGR − PLR difference between levels.\n\n"
-                + tbl.round(4).to_string(index=False))
+                "P(sell|loss), the regression counterpart of PGR − PLR. Every term is listed; "
+                "terms not in the fitted model are shown with the reason.\n\n"
+                "TABLE 1. Regression\n"
+                + table_text(tbl[["term", "coef", "se", "p", "ci_lo", "ci_hi"]]
+                             .assign(status=tbl["status"].str.replace("omitted: ", "")))
+                + "\n\nTABLE 2. Raw DE difference (pooled PGR − PLR, level 1 minus level 0; "
+                "memory: arm minus none), 95% path-bootstrap CI\n"
+                + ("" if reg_note == "full §5.2 model" else
+                   "CAUTION: with this few profiles attributes that are on together cannot be "
+                   "separated; read these as descriptive only.\n")
+                + (table_text(raw[["label", "raw_DE_diff", "raw_lo", "raw_hi"]])
+                   if not raw.empty else "(none)"))
     else:
         text = f"Regression {reg_note}."
     (out / "regression.txt").write_text(text)

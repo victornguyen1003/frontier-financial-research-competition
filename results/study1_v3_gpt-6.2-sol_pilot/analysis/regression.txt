@@ -1,0 +1,1 @@
+Regression not estimable (needs at least 2 profiles and 2 paths with sales).

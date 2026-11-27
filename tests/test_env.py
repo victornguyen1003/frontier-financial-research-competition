@@ -49,9 +49,7 @@ def test_missing_key_fails_fast_with_instructions(tmp_path, monkeypatch):
         env.require_api_key()
 
 
-def test_env_is_git_ignored_and_template_is_not():
+def test_env_is_git_ignored():
     def ignored(p):
         return subprocess.run(["git", "-C", str(ROOT), "check-ignore", "-q", p]).returncode == 0
     assert ignored(".env") and ignored(".env.local")
-    assert not ignored(".env.example")
-    assert "OPENAI_API_KEY=" in (ROOT / ".env.example").read_text()

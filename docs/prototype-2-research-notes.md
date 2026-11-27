@@ -182,6 +182,49 @@ Found while building the prototype (2026-11-27), before any pilot was run.
   cannot separate attribute effects from other profile differences, so the profile variance
   left after δ-sized attribute effects is an assumption.
 
+**Pilot checks (Luna and Sol pilots, 2026-11-27)**
+
+- **No leakage found.** All 2,520 decision prompts show prices only up to the current month;
+  no future price appears anywhere, and runs share nothing except identical prompts.
+- **The baseline model has a reverse DE.** Prototype 1 (v2, 900 Luna runs) gave pooled DE ≈
+  −0.15 to −0.22, and C0 in v3 gives −0.40 (Sol: −0.11). Without persona cues, the models sell
+  losers more readily than winners.
+- **Positive DE comes from the persona sentences.** Profiles pool to +0.38 and C1 to +0.66.
+  Several attribute sentences (realization utility, mental accounting, regret aversion) describe
+  the preferences that produce a DE, so a positive d_k shows that the model follows a stated
+  preference, not that it has the bias on its own. Results should be framed that way.
+- **Contamination.** Luna names a theory ("loss aversion") in 3.5% of its reasoning texts, when
+  paraphrasing the loss-sensitivity sentence.
+- **C0 rarely trades.** Its level-0 trading-activity sentence ("rarely trade") leaves only 18
+  sales across 15 Luna runs, so C0's DE is imprecise. Every profile with trading activity at
+  level 0 shares this.
+- **Not an artifact of timing or a few runs.** Only 3–5% of profile and C1 sales fall in the
+  final month, and 89% of profile runs have DE > 0.
+- **Unbalanced pilot draws.** In the 8 pilot profiles, financial literacy is on in 7 and loss
+  sensitivity, realization utility, professional and trading activity in 6. This is chance;
+  the main run's 30 draws are closer to balanced.
+
+**Power analysis (Luna pilot)**
+
+- **First version unusable.** Its MDE came out at 0.30–0.53, and joint power fell as P
+  increased. Two inputs caused this. Baseline sell rates came from C0, which made 18 sales
+  and has a reverse DE. And all profile variance not explained by δ-sized attribute effects
+  was treated as noise, although the pilot's raw attribute differences (±0.3–0.6) suggest
+  most of it is attribute effects.
+- **Corrected inputs.** The baseline now comes from the profiles, and the residual
+  heterogeneity is an explicit assumption: SD 0.1, with sensitivity runs at 0 and 0.2.
+- **Results depend on that assumption.** The pilot cannot estimate it (8 profiles against 11
+  attributes is saturated). For the main design (P = 40, S = 20; 500 simulations at SD 0.1,
+  200 at 0 and 0.2), the Holm MDE for d_k is 0.041 (residual 0), 0.125 (0.1) or 0.230 (0.2),
+  and the minimum power for d_k at δ = 0.05 is 0.91, 0.08 or 0.02. At residual 0, 40 × 15
+  would already reach 80% power.
+- **δ = 0.05 is not detectable unless the residual is near 0.** The memory test and the C1
+  manipulation check have power near 1.
+- **Design shape barely matters at a fixed cost.** 40×20, 60×13, 80×10 and 100×8 are within
+  about 0.015 of each other in MDE.
+- **Main run.** Following the plan's rule (largest affordable design on the pre-specified
+  grid), it uses P = 40, S = 20: 2,520 runs, about $6.0.
+
 **Budget and models**
 
 - **Sol pilot does not fit its limit.** `gpt-6.2-sol` (the ID in the OpenAI project) reportedly

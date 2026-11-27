@@ -48,8 +48,11 @@ def persona_roster(cfg: dict, n_profiles: int | None) -> list[dict]:
 
 def stage_size(cfg: dict, stage: str, args) -> tuple[int | None, int]:
     st = cfg["stages"][stage]
-    prof = getattr(args, "profiles", None) or st.get("profiles", cfg.get("profiles", {}).get("n"))
-    return prof, getattr(args, "scenarios", None) or st["scenarios"]
+    prof = getattr(args, "profiles", None)
+    if prof is None:                      # 0 is valid: C0 and C1 only
+        prof = st.get("profiles", cfg.get("profiles", {}).get("n"))
+    scen = getattr(args, "scenarios", None)
+    return prof, scen if scen is not None else st["scenarios"]
 
 
 def build_grid(roster: list[dict], archs: list[str], n_scen: int) -> list[tuple]:
@@ -290,6 +293,29 @@ def stage_limit(cfg: dict, stage: str, model: str) -> float | None:
 
 
 def main():
+    """Run, then send a phone notification (ntfy, NTFY_TOPIC in .env) when a real run ends,
+    whether it completed, stopped on an error or was interrupted."""
+    from llm_investors.notify import notify
+    info: dict = {}
+    try:
+        _main(info)
+    except BaseException as e:  # noqa: BLE001
+        if info.get("started"):
+            code = e.code if isinstance(e, SystemExit) else type(e).__name__
+            if not (isinstance(e, SystemExit) and e.code in (0, None)):
+                notify(f"Study 1 {info['name']} STOPPED", f"{info.get('summary', '')}\n"
+                       f"exit: {code}. See logs/{info['name']}/.", tags="warning",
+                       priority="high")
+            else:
+                notify(f"Study 1 {info['name']} finished", info.get("summary", ""),
+                       tags="white_check_mark")
+        raise
+    if info.get("started"):
+        notify(f"Study 1 {info['name']} finished", info.get("summary", ""),
+               tags="white_check_mark")
+
+
+def _main(info: dict):
     ap = base_args(__doc__)
     ap.add_argument("--scenarios", type=int, help="override the stage's number of paths (S)")
     ap.add_argument("--profiles", type=int, help="override the stage's number of profiles (P)")
@@ -326,9 +352,16 @@ def main():
         est = estimate(cfg, roster, n_scen)
         print_estimate(est, limit, None, f"{name} ({args.stage}, {model})")
         if limit is not None and est["typical_usd"] > limit:
+            k = max_affordable_scenarios(est, n_scen, limit)
+            per_run = est["per_run_typical_usd"]
+            hint = (f"e.g. --scenarios {k}" if k >= 1 else
+                    f"even one path ({len(roster) * len(archs)} runs, "
+                    f"≈ ${per_run * len(roster) * len(archs):.2f}) is over the limit: the limit "
+                    f"buys about {int(limit // per_run)} runs at ${per_run:.4f} each, so also "
+                    f"lower --profiles (0 = C0 and C1 only) or raise "
+                    f"budget.stage_limits in config/study1.yaml")
             sys.exit(f"The typical projection exceeds the stage limit ${limit:.2f}. Shrink the "
-                     f"stage first, e.g. --scenarios "
-                     f"{max(1, max_affordable_scenarios(est, n_scen, limit))} (plan §8).")
+                     f"stage first (plan §8): {hint}.")
         if args.stage == "full" and not confirm_full_run(cfg, args, proj_file):
             return
         if args.stage == "pilot" and not args.yes and \
@@ -339,6 +372,8 @@ def main():
                 *(ROOT / "logs" / log_name).glob("FATAL_ERROR.json")]:
         old.unlink()  # each invocation rewrites the stage's logs (replays are free)
     grid = build_grid(roster, archs, n_scen)
+    info.update(name=name, started=not args.dry_run and backend == "openai",
+                summary=f"{args.stage}, {model}: {len(grid)} runs started")
     if args.dry_run:
         grid = grid[: len(roster) * len(archs)]  # one scenario each
     stop = threading.Event()
@@ -355,6 +390,10 @@ def main():
     statuses = {s: sum(r["status"] == s for r in results) for s in {r["status"] for r in results}}
     print(f"\nruns: {statuses}")
     print(f"cost: {json.dumps(llm.cost.summary())}")
+    cs = llm.cost.summary()
+    info["summary"] = (f"{args.stage}, {model}: runs {statuses}; spent ${cs['spent_usd']:.3f} "
+                       f"this stage, ${cs['spent_total_usd']:.3f} of ${cs['cap_usd']:.2f} total; "
+                       f"{cs['api_calls']} API calls, {cs['cache_hits']} cache hits")
     if args.dry_run:
         report_dry_run(cfg, roster, n_scen, args.stage, model)
         return
@@ -377,7 +416,9 @@ def main():
     if code:
         sys.exit(code)        # no cost projection from an interrupted pilot
     if args.stage == "pilot" and backend == "openai" and not args.replay:
-        project(cfg, name, llm, proj_file, roster, n_scen)
+        line = project(cfg, name, llm, proj_file, roster, n_scen)
+        if line:
+            info["summary"] += "\n" + line
 
 
 def summarize(runs):
@@ -422,10 +463,13 @@ def project(cfg, name, llm, proj_file, pilot_roster, pilot_scen):
     print(f"\nMeasured per call: {st['mean_input_tokens']:.0f} input, "
           f"{st['mean_output_tokens']:.0f} output ({st['mean_reasoning_tokens']:.0f} reasoning) "
           f"tokens, ${st['mean_cost_usd']:.6f}; ${cost_per_run:.4f} per run")
+    proj_line = (f"Projected full run ({full_runs:,} runs): ≈ ${full_cost:.2f} "
+                 f"(${cost_per_run:.4f}/run)")
     print(f"Projected full run ({full_runs:,} runs): ≈ ${full_cost:.2f} "
           f"(≈ ${full_cost * frac_new:.2f} new, if the same model) vs stage limit "
           f"${p['stage_limit_full_usd']}.")
     print(f"Next (free): build-dataset {name} && power-study1 {name}")
+    return proj_line
 
 
 def report_dry_run(cfg, roster, n_scen, stage, model):

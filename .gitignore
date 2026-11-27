@@ -1,9 +1,8 @@
 .venv/
 
-# Secrets: the OpenAI key lives in a local .env (template: .env.example, which is committed).
+# Secrets: the OpenAI key lives in a local .env (one line: OPENAI_API_KEY=sk-...).
 .env
 .env.*
-!.env.example
 __pycache__/
 .pytest_cache/
 *.egg-info/

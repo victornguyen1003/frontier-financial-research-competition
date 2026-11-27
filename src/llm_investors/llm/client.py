@@ -141,7 +141,7 @@ class LLMClient:
                 if not os.environ.get("OPENAI_API_KEY"):
                     # classified as a fatal api_error: the study stops with a clear report
                     raise openai.OpenAIError(f"OPENAI_API_KEY is not set: put it in {ENV_FILE} "
-                                             "(see .env.example) or export it")
+                                             "(one line: OPENAI_API_KEY=sk-...) or export it")
                 # SDK retries are disabled: backoff is handled here, without an attempt limit.
                 self._client = OpenAI(timeout=self.cfg.get("timeout_s", 900), max_retries=0)
             return self._client

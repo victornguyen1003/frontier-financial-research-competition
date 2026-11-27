@@ -1,0 +1,21 @@
+{
+  "calls": 282,
+  "mean_input_tokens": 881.5957446808511,
+  "mean_output_tokens": 238.46808510638297,
+  "mean_reasoning_tokens": 0.0,
+  "mean_cost_usd": 0.0041478723404255345,
+  "json_retry_rate": 0.0,
+  "service_tiers": {
+    "default": 282
+  },
+  "pilot_runs": 18,
+  "calls_per_run": 15.666666666666666,
+  "cost_per_run_usd": 0.06498333333333337,
+  "model": "gpt-6.2-sol",
+  "projected_full_runs": 1440,
+  "projected_full_calls": 22560,
+  "projected_full_cost_usd": 93.57600000000005,
+  "projected_remaining_cost_usd": 92.40630000000006,
+  "cap_usd": 10.0,
+  "stage_limit_full_usd": 6.5
+}

@@ -1,0 +1,41 @@
+{
+  "alpha": 0.05,
+  "blind_spot_band": 0.03,
+  "rq1_paired": {
+    "by_profile": {},
+    "spread_sd_of_profile_minus_C0": null,
+    "n_significant_holm": 0
+  },
+  "manipulation_check": {
+    "n_paths": 3,
+    "mean_diff": 0.3402478180901562,
+    "ci_lo": 0.12084944552746796,
+    "ci_hi": 0.5760090921614547,
+    "se": 0.13164774259405196,
+    "p_wilcoxon": 0.125,
+    "mde": 0.7060680363118851,
+    "hypothesis": "DE(C1) > DE(C0), one-sided"
+  },
+  "C0_vs_profiles_pooled_DE": {
+    "C0": -0.11349306431273642,
+    "profiles": null
+  },
+  "rq2_sameness": {
+    "all periods": {
+      "profile_pairs_identical": null,
+      "profile_pairs": 0,
+      "C0_C1_identical": 0.3037037037037037,
+      "C0_C1_pairs": 135
+    },
+    "period 1": {
+      "profile_pairs_identical": null,
+      "profile_pairs": 0,
+      "C0_C1_identical": 0.0,
+      "C0_C1_pairs": 9
+    }
+  },
+  "rq3_tags": null,
+  "n_runs": 18,
+  "n_decision_rows": 533,
+  "regression_model": "not estimable (needs at least 2 profiles and 2 paths with sales)"
+}
