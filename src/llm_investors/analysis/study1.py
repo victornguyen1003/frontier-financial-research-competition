@@ -143,8 +143,9 @@ def regression_sample(dec: pd.DataFrame) -> pd.DataFrame:
 
 
 def regression(dec: pd.DataFrame):
-    """Returns (fit, sample, note, omitted). `omitted` lists every §5.2 term that is not in the
-    fitted model, with the reason, so the regression table can show it.
+    """Returns (fit, sample, note, omitted, builder). `omitted` lists every §5.2 term that is
+    not in the fitted model, with the reason, so the regression table can show it. `builder`
+    rebuilds the fitted design matrix for a modified sample (marginal effects).
 
     With fewer distinct profiles than attribute parameters (e.g. the pilot's 8 profiles
     against 11 attributes + a constant), the attribute terms are not identified; the model then
@@ -152,26 +153,36 @@ def regression(dec: pd.DataFrame):
     memory terms can still be estimated."""
     d = regression_sample(dec)
     if d.empty or d["persona"].nunique() < 2 or d["scenario"].nunique() < 2:
-        return None, d, "not estimable (needs at least 2 profiles and 2 paths with sales)", []
+        return (None, d, "not estimable (needs at least 2 profiles and 2 paths with sales)", [],
+                None)
     X, names = design_matrix(d)
     keep = X.std(axis=0) > 0
     keep[0] = True
     omitted = [(n, "omitted: no variation in the sample") for n, k in zip(names, keep) if not k]
     full_names = names
     X, names = X[:, keep], [n for n, k in zip(names, keep) if k]
+
+    def builder(dd: pd.DataFrame) -> np.ndarray:
+        return design_matrix(dd)[0][:, keep]
     note = "full §5.2 model"
     if np.linalg.matrix_rank(X) < X.shape[1]:
-        fe = pd.get_dummies(d["persona"], drop_first=True, dtype=float)
-        gain = d["gain"].to_numpy(float)
-        cols = [np.ones(len(d)), gain, fe.to_numpy()]
-        names = ["const", "gain"] + [f"profile_{c}" for c in fe.columns]
+        cats = sorted(d["persona"].unique())
+
+        def builder(dd: pd.DataFrame) -> np.ndarray:  # noqa: F811
+            fe = pd.get_dummies(pd.Categorical(dd["persona"], categories=cats),
+                                dtype=float).iloc[:, 1:]
+            gain = dd["gain"].to_numpy(float)
+            cols = [np.ones(len(dd)), gain, fe.to_numpy()]
+            for m in MEMS:
+                mm = (dd["architecture"] == m).to_numpy(float)
+                cols += [mm[:, None], (gain * mm)[:, None]]
+            cols += [dd[c].to_numpy(float)[:, None] for c in CONTROLS]
+            return np.column_stack([c if c.ndim == 2 else c[:, None] for c in cols])
+        X = builder(d)
+        names = ["const", "gain"] + [f"profile_{c}" for c in cats[1:]]
         for m in MEMS:
-            mm = (d["architecture"] == m).to_numpy(float)
-            cols += [mm[:, None], (gain * mm)[:, None]]
             names += [f"mem_{m}", f"gain:mem_{m}"]
-        cols += [d[c].to_numpy(float)[:, None] for c in CONTROLS]
         names += CONTROLS
-        X = np.column_stack([c if c.ndim == 2 else c[:, None] for c in cols])
         note = (f"attribute terms NOT IDENTIFIED with {d['persona'].nunique()} profiles "
                 f"({len(ATTRIBUTE_KEYS)} attributes + constant); fitted with profile fixed "
                 "effects and gain x memory terms only. Attribute effects need the main run.")
@@ -182,7 +193,46 @@ def regression(dec: pd.DataFrame):
                         "reference profile (absorbed in const)"))
     fit = ols(d["sold"].to_numpy(float), X, names,
               [d["scenario"].to_numpy(), d["persona"].to_numpy()])
-    return fit, d, note, omitted
+    return fit, d, note, omitted, builder
+
+
+def robustness_text(out: Path, sample: pd.DataFrame, fit, builder) -> str:
+    """Logit, odds ratios, marginal effects and alternative clustering (models.py). Writes
+    regression_models.csv, marginal_effects.csv and robustness.csv; returns tables 3-5."""
+    from llm_investors.analysis import models as M
+    X = builder(sample)
+    fits = M.fit_all(sample, X, fit.names)
+    coefs = pd.concat([M.coef_rows(m) for m in fits], ignore_index=True)
+    coefs.to_csv(out / "regression_models.csv", index=False)
+    me = M.marginal_effects(fits, sample, builder, attr_cols(), MEMS, CONTROLS)
+    me.to_csv(out / "marginal_effects.csv", index=False)
+    rob = M.robustness_summary(coefs, fits)
+    rob.to_csv(out / "robustness.csv", index=False)
+    lg = coefs[(coefs["model"] == "logit") & (coefs["clustering"] == M.PRIMARY)]
+    conv = "" if bool(lg["converged"].all()) else "  WARNING: logit did not converge.\n"
+    de = me[(me["clustering"] == M.PRIMARY) & (me["effect"] == "effect on DE")]
+    de = de.pivot(index="variable", columns="model", values=["estimate", "se", "p"])
+    de.columns = [f"{m}_{v}" for v, m in de.columns]
+    de = de.reset_index()
+    ame = me[(me["clustering"] == M.PRIMARY) & (me["effect"] == "AME on P(sell)")]
+    sens = coefs[coefs["term"].str.startswith(("gain:attr_", "gain:mem_"))].pivot_table(
+        index=["term"], columns=["model", "clustering"], values="se", sort=False)
+    sens.columns = [f"{m} se, {c}" for m, c in sens.columns]
+    return ("TABLE 3. Logit (same regressors), odds ratios; SEs two-way clustered by path and "
+            "profile\n" + conv
+            + table_text(lg[["term", "coef", "se", "p", "odds_ratio", "or_lo", "or_hi"]])
+            + "\n\nTABLE 4. Effect on DE = average change in P(sell|gain) − P(sell|loss) when "
+            "the variable goes 0 → 1 (memory: arm vs none). LPM: equals d_k / f_m. Logit: "
+            "average marginal interaction effect. Delta-method SEs, path × profile.\n"
+            + table_text(de)
+            + "\n\nTABLE 5. Average marginal effects on P(sell) (binary: 0 → 1; controls: "
+            "dP/dx), path × profile\n"
+            + table_text(ame[["model", "variable", "estimate", "se", "p", "ci_lo", "ci_hi"]])
+            + "\n\nTABLE 6. Standard errors of the DE terms under each clustering "
+            "(agent run = one persona × memory arm × path)\n"
+            + table_text(sens.reset_index())
+            + "\n\nTABLE 7. Robustness: Holm-significant d_k and joint tests by model and "
+            "clustering\n" + table_text(rob))
 
 
 def table_text(t: pd.DataFrame) -> str:
@@ -616,8 +666,8 @@ def main(name: str):
         old.unlink()                      # figures of an earlier run must not linger
     cells = cell_table(runs)
     cells.to_csv(out / "cells.csv", index=False)
-    fit, sample, reg_note, omitted = regression(dec) if not dec.empty else \
-        (None, dec, "no decisions", [])
+    fit, sample, reg_note, omitted, builder = regression(dec) if not dec.empty else \
+        (None, dec, "no decisions", [], None)
     raw = attribute_de(runs)
     raw.to_csv(out / "attribute_de.csv", index=False)
     de_by_variable(runs).to_csv(out / "de_by_variable.csv", index=False)
@@ -646,8 +696,11 @@ def main(name: str):
                    "separated; read these as descriptive only.\n")
                 + (table_text(raw[["label", "raw_DE_diff", "raw_lo", "raw_hi"]])
                    if not raw.empty else "(none)"))
+        text += "\n\n" + robustness_text(out, sample, fit, builder)
     else:
         text = f"Regression {reg_note}."
+        for f in ("regression_models", "marginal_effects", "robustness"):
+            (out / f"{f}.csv").unlink(missing_ok=True)
     (out / "regression.txt").write_text(text)
     tests, blind = run_tests(runs, dec, fit, reasoning, tags)
     blind.to_csv(out / "blind_spots.csv", index=False)

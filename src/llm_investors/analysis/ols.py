@@ -60,14 +60,12 @@ def _meat(X: np.ndarray, u: np.ndarray, g: np.ndarray) -> tuple[np.ndarray, int]
     return S.T @ S, G
 
 
-def ols(y: np.ndarray, X: np.ndarray, names: list[str], clusters: list[np.ndarray]) -> Fit:
-    """clusters: one or two arrays of group labels (two-way adds their intersection)."""
-    y, X = np.asarray(y, float), np.asarray(X, float)
-    n, k = X.shape
-    XtX_inv = np.linalg.pinv(X.T @ X)
-    beta = XtX_inv @ (X.T @ y)
-    u = y - X @ beta
-    adj = (n - 1) / max(1, n - k)
+def cluster_vcov(bread: np.ndarray, X: np.ndarray, u: np.ndarray, clusters: list[np.ndarray],
+                 adj: float = 1.0) -> tuple[np.ndarray, int]:
+    """Sandwich bread @ meat @ bread with one-way or two-way (CGM) clustering. Scores are
+    X * u (OLS residuals, or y - p for a logit). Each term gets G/(G-1) * adj. Returns the
+    PSD-corrected covariance and the smallest number of clusters."""
+    k = X.shape[1]
     terms = [(c, 1) for c in clusters]
     if len(clusters) == 2:
         a, b = (np.asarray(c).astype(str) for c in clusters)
@@ -78,11 +76,22 @@ def ols(y: np.ndarray, X: np.ndarray, names: list[str], clusters: list[np.ndarra
         M, G = _meat(X, u, np.asarray(g))
         if sign > 0:
             gs.append(G)
-        V += sign * (G / max(1, G - 1)) * adj * (XtX_inv @ M @ XtX_inv)
+        V += sign * (G / max(1, G - 1)) * adj * (bread @ M @ bread)
     w, Q = np.linalg.eigh((V + V.T) / 2)
     if (w < 0).any():
         V = Q @ np.diag(np.clip(w, 0, None)) @ Q.T
-    return Fit(list(names), beta, V, n, min(gs))
+    return V, min(gs)
+
+
+def ols(y: np.ndarray, X: np.ndarray, names: list[str], clusters: list[np.ndarray]) -> Fit:
+    """clusters: one or two arrays of group labels (two-way adds their intersection)."""
+    y, X = np.asarray(y, float), np.asarray(X, float)
+    n, k = X.shape
+    XtX_inv = np.linalg.pinv(X.T @ X)
+    beta = XtX_inv @ (X.T @ y)
+    u = y - X @ beta
+    V, g_min = cluster_vcov(XtX_inv, X, u, clusters, adj=(n - 1) / max(1, n - k))
+    return Fit(list(names), beta, V, n, g_min)
 
 
 def holm(p: np.ndarray) -> np.ndarray:

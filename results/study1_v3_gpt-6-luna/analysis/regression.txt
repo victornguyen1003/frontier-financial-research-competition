@@ -1,0 +1,170 @@
+Model: full §5.2 model
+Decision-level LPM (plan §5.2), profiles only; SEs two-way clustered by path and profile; t with 19 df.
+sold ~ gain + attr_k + gain:attr_k + mem_m + gain:mem_m + ret + holding_period + drawdown
+N = 41583, paths = 20, profiles = 40
+
+d_k (gain:attr_k) and f_m (gain:mem_m) are the change in P(sell|gain) − P(sell|loss), the regression counterpart of PGR − PLR. Every term is listed; terms not in the fitted model are shown with the reason.
+
+TABLE 1. Regression
+                         term    coef      se       p   ci_lo   ci_hi    status
+                        const  0.1574  0.0365  0.0004   0.081  0.2337 estimated
+                         gain  0.0775  0.0649  0.2471 -0.0583  0.2133 estimated
+        attr_loss_sensitivity  0.0313  0.0116   0.014  0.0071  0.0555 estimated
+       attr_mental_accounting -0.0423  0.0156  0.0136 -0.0748 -0.0097 estimated
+         attr_regret_aversion  -0.029  0.0149  0.0664 -0.0601  0.0022 estimated
+     attr_realization_utility -0.0638  0.0201   0.005 -0.1059 -0.0218 estimated
+      attr_financial_literacy -0.0049  0.0156  0.7577 -0.0375  0.0277 estimated
+              attr_experience  0.0076  0.0147   0.612 -0.0231  0.0383 estimated
+            attr_professional  0.0584   0.016  0.0017  0.0249   0.092 estimated
+                     attr_age -0.0034  0.0142  0.8136 -0.0331  0.0263 estimated
+                  attr_gender -0.0054  0.0142  0.7057 -0.0352  0.0243 estimated
+        attr_market_knowledge -0.1195    0.02     0.0 -0.1613 -0.0777 estimated
+        attr_trading_activity  0.0203  0.0136   0.153 -0.0082  0.0488 estimated
+   gain:attr_loss_sensitivity -0.0399   0.018  0.0393 -0.0776 -0.0022 estimated
+  gain:attr_mental_accounting  0.2615  0.0184     0.0  0.2231  0.2999 estimated
+    gain:attr_regret_aversion  0.1201  0.0197     0.0  0.0788  0.1614 estimated
+gain:attr_realization_utility  0.2236   0.032     0.0  0.1565  0.2906 estimated
+ gain:attr_financial_literacy -0.0792  0.0246  0.0046 -0.1308 -0.0276 estimated
+         gain:attr_experience  0.0028  0.0229  0.9024 -0.0451  0.0508 estimated
+       gain:attr_professional -0.1852  0.0264     0.0 -0.2404 -0.1299 estimated
+                gain:attr_age -0.0321  0.0226   0.171 -0.0793  0.0151 estimated
+             gain:attr_gender -0.0245  0.0199  0.2345 -0.0662  0.0172 estimated
+   gain:attr_market_knowledge  0.2285  0.0317     0.0  0.1622  0.2949 estimated
+   gain:attr_trading_activity  0.0688  0.0205  0.0033  0.0259  0.1117 estimated
+                      mem_log -0.0321    0.01  0.0047 -0.0531 -0.0111 estimated
+                  mem_reflect  0.0403  0.0189  0.0462  0.0007  0.0798 estimated
+                 gain:mem_log  0.0497  0.0182  0.0132  0.0116  0.0878 estimated
+             gain:mem_reflect -0.1293  0.0298  0.0004 -0.1917  -0.067 estimated
+                          ret  0.3102  0.0331     0.0   0.241  0.3794 estimated
+               holding_period -0.0005   0.003  0.8778 -0.0067  0.0057 estimated
+                     drawdown -1.8461  0.2021     0.0 -2.2691 -1.4231 estimated
+
+TABLE 2. Raw DE difference (pooled PGR − PLR, level 1 minus level 0; memory: arm minus none), 95% path-bootstrap CI
+                    label raw_DE_diff  raw_lo  raw_hi
+         Loss sensitivity     -0.1531 -0.1874 -0.1222
+        Mental accounting       0.242  0.2039   0.285
+          Regret aversion      0.2109    0.17  0.2572
+      Realization utility      0.0092 -0.0302   0.048
+       Financial literacy     -0.1681 -0.2176 -0.1282
+               Experience       0.097  0.0716  0.1246
+             Professional     -0.1357 -0.1785 -0.0998
+              Age (older)      -0.068 -0.0927 -0.0429
+           Gender (woman)      0.0215  0.0045  0.0388
+         Market knowledge      0.2077  0.1564  0.2641
+Trading activity (active)      0.0873  0.0655  0.1109
+               log - none      0.0414  0.0232   0.061
+           reflect - none     -0.1307 -0.1593 -0.1046
+
+TABLE 3. Logit (same regressors), odds ratios; SEs two-way clustered by path and profile
+                         term     coef      se       p odds_ratio    or_lo    or_hi
+                        const  -1.2378  0.3817  0.0043       0.29   0.1305   0.6448
+                         gain  -0.5066  0.5543  0.3721     0.6025   0.1889   1.9221
+        attr_loss_sensitivity   0.6116  0.1313  0.0002     1.8434   1.4006   2.4263
+       attr_mental_accounting  -0.6303  0.1341  0.0002     0.5325   0.4022   0.7049
+         attr_regret_aversion  -0.5253  0.1596  0.0038     0.5914   0.4234   0.8259
+     attr_realization_utility  -1.3701  0.1984     0.0     0.2541   0.1678   0.3849
+      attr_financial_literacy  -0.2664  0.2052  0.2097     0.7661   0.4987   1.1771
+              attr_experience  -0.1154  0.1342  0.4004      0.891   0.6729   1.1799
+            attr_professional     0.47  0.1615   0.009     1.5999   1.1411   2.2432
+                     attr_age    -0.18  0.0951  0.0739     0.8353   0.6845   1.0193
+                  attr_gender   0.4999  0.1304  0.0011     1.6485   1.2547   2.1659
+        attr_market_knowledge  -2.6524  0.2157     0.0     0.0705   0.0449   0.1107
+        attr_trading_activity   0.7049  0.1076     0.0     2.0235   1.6154   2.5349
+   gain:attr_loss_sensitivity  -0.7021  0.1527  0.0002     0.4956     0.36   0.6822
+  gain:attr_mental_accounting   1.7673  0.1608     0.0     5.8551   4.1814   8.1987
+    gain:attr_regret_aversion   1.0265  0.2061  0.0001     2.7914   1.8132   4.2973
+gain:attr_realization_utility   2.3375  0.2732     0.0    10.3553   5.8453  18.3452
+ gain:attr_financial_literacy  -0.2186  0.2544  0.4008     0.8037   0.4719   1.3686
+         gain:attr_experience   0.1366  0.1913  0.4839     1.1463   0.7682   1.7107
+       gain:attr_professional  -1.1522   0.197     0.0      0.316   0.2092   0.4772
+                gain:attr_age  -0.0248  0.1479  0.8684     0.9755   0.7158   1.3294
+             gain:attr_gender  -0.6125   0.151  0.0007      0.542   0.3952   0.7434
+   gain:attr_market_knowledge   3.2384  0.2592     0.0    25.4929  14.8175  43.8593
+   gain:attr_trading_activity  -0.2008  0.1422   0.174     0.8181   0.6075   1.1016
+                      mem_log  -0.6477   0.114     0.0     0.5232   0.4122   0.6642
+                  mem_reflect   0.4646   0.245  0.0732     1.5915    0.953   2.6577
+                 gain:mem_log   0.7408   0.137     0.0     2.0975   1.5746    2.794
+             gain:mem_reflect  -0.9172  0.2905  0.0052     0.3996   0.2175   0.7341
+                          ret   2.7782   0.496     0.0    16.0893   5.6977  45.4328
+               holding_period  -0.0165  0.0207  0.4361     0.9836   0.9418   1.0273
+                     drawdown -14.2005  2.1895     0.0        0.0      0.0   0.0001
+
+TABLE 4. Effect on DE = average change in P(sell|gain) − P(sell|loss) when the variable goes 0 → 1 (memory: arm vs none). LPM: equals d_k / f_m. Logit: average marginal interaction effect. Delta-method SEs, path × profile.
+                variable LPM_estimate logit_estimate  LPM_se logit_se   LPM_p logit_p
+                attr_age      -0.0321        -0.0231  0.0226   0.0209   0.171  0.2838
+         attr_experience       0.0028         0.0139  0.0229   0.0263  0.9024  0.6018
+ attr_financial_literacy      -0.0792        -0.0698  0.0246   0.0308  0.0046  0.0352
+             attr_gender      -0.0245        -0.0665  0.0199   0.0199  0.2345  0.0035
+   attr_loss_sensitivity      -0.0399        -0.0685   0.018   0.0185  0.0393  0.0015
+   attr_market_knowledge       0.2285          0.308  0.0317   0.0327     0.0     0.0
+  attr_mental_accounting       0.2615         0.2749  0.0184   0.0192     0.0     0.0
+       attr_professional      -0.1852        -0.1711  0.0264   0.0247     0.0     0.0
+attr_realization_utility       0.2236         0.3133   0.032   0.0359     0.0     0.0
+    attr_regret_aversion       0.1201         0.1416  0.0197   0.0244     0.0     0.0
+   attr_trading_activity       0.0688         0.0375  0.0205   0.0161  0.0033  0.0313
+                 mem_log       0.0497         0.0685  0.0182   0.0149  0.0132  0.0002
+             mem_reflect      -0.1293        -0.1312  0.0298   0.0337  0.0004   0.001
+
+TABLE 5. Average marginal effects on P(sell) (binary: 0 → 1; controls: dP/dx), path × profile
+model                 variable estimate      se       p   ci_lo   ci_hi
+  LPM                     gain   0.3175  0.0349     0.0  0.2444  0.3905
+  LPM    attr_loss_sensitivity   0.0095   0.008  0.2522 -0.0073  0.0263
+  LPM   attr_mental_accounting    0.101  0.0113     0.0  0.0772  0.1247
+  LPM     attr_regret_aversion   0.0368  0.0079  0.0002  0.0204  0.0533
+  LPM attr_realization_utility   0.0587  0.0106     0.0  0.0365  0.0808
+  LPM  attr_financial_literacy  -0.0483  0.0107  0.0002 -0.0706  -0.026
+  LPM          attr_experience   0.0091  0.0133  0.5001 -0.0187  0.0369
+  LPM        attr_professional  -0.0431  0.0104  0.0005 -0.0647 -0.0214
+  LPM                 attr_age   -0.021  0.0075  0.0116 -0.0367 -0.0053
+  LPM              attr_gender  -0.0188  0.0086  0.0406 -0.0368 -0.0009
+  LPM    attr_market_knowledge   0.0058  0.0103  0.5815 -0.0157  0.0272
+  LPM    attr_trading_activity    0.058   0.007     0.0  0.0433  0.0727
+  LPM                  mem_log  -0.0048  0.0074  0.5183 -0.0202  0.0106
+  LPM              mem_reflect  -0.0306  0.0078  0.0009  -0.047 -0.0142
+  LPM                      ret   0.3102  0.0331     0.0   0.241  0.3794
+  LPM           holding_period  -0.0005   0.003  0.8778 -0.0067  0.0057
+  LPM                 drawdown  -1.8461  0.2021     0.0 -2.2691 -1.4231
+logit                     gain   0.2862  0.0408     0.0  0.2007  0.3716
+logit    attr_loss_sensitivity    0.007  0.0089  0.4418 -0.0117  0.0257
+logit   attr_mental_accounting   0.1057  0.0111     0.0  0.0825  0.1289
+logit     attr_regret_aversion   0.0395  0.0063     0.0  0.0262  0.0527
+logit attr_realization_utility   0.0479  0.0139  0.0027  0.0188   0.077
+logit  attr_financial_literacy  -0.0602   0.011     0.0 -0.0833 -0.0371
+logit          attr_experience   -0.001  0.0123   0.934 -0.0267  0.0247
+logit        attr_professional  -0.0594  0.0124  0.0001 -0.0854 -0.0335
+logit                 attr_age  -0.0271  0.0093  0.0091 -0.0467 -0.0076
+logit              attr_gender   0.0034  0.0102  0.7395 -0.0179  0.0248
+logit    attr_market_knowledge   0.0001   0.009  0.9919 -0.0188   0.019
+logit    attr_trading_activity   0.0733  0.0072     0.0  0.0583  0.0883
+logit                  mem_log  -0.0062  0.0075   0.423 -0.0219  0.0096
+logit              mem_reflect  -0.0323  0.0082  0.0009 -0.0495  -0.015
+logit                      ret   0.3769  0.0608     0.0  0.2496  0.5042
+logit           holding_period  -0.0022  0.0028  0.4289  -0.008  0.0036
+logit                 drawdown  -1.9266  0.2627     0.0 -2.4765 -1.3766
+
+TABLE 6. Standard errors of the DE terms under each clustering (agent run = one persona × memory arm × path)
+                         term LPM se, path × profile logit se, path × profile LPM se, path logit se, path LPM se, profile logit se, profile LPM se, agent run logit se, agent run
+   gain:attr_loss_sensitivity                  0.018                   0.1527       0.0112         0.0571          0.0214            0.1972            0.0122               0.131
+  gain:attr_mental_accounting                 0.0184                   0.1608       0.0155         0.1416          0.0226             0.201            0.0153              0.1713
+    gain:attr_regret_aversion                 0.0197                   0.2061       0.0143         0.1544           0.022            0.2341            0.0127              0.1769
+gain:attr_realization_utility                  0.032                   0.2732       0.0181         0.1901          0.0328              0.27            0.0144              0.1702
+ gain:attr_financial_literacy                 0.0246                   0.2544       0.0157         0.1796          0.0255            0.2398            0.0128               0.149
+         gain:attr_experience                 0.0229                   0.1913       0.0172         0.1087          0.0251            0.2157            0.0153              0.1419
+       gain:attr_professional                 0.0264                    0.197       0.0196         0.1715          0.0255            0.1835            0.0137              0.1373
+                gain:attr_age                 0.0226                   0.1479       0.0134         0.1392          0.0241            0.1402            0.0117              0.1127
+             gain:attr_gender                 0.0199                    0.151       0.0115          0.115           0.024            0.1823            0.0133              0.1521
+   gain:attr_market_knowledge                 0.0317                   0.2592       0.0284          0.282           0.023            0.1843             0.014              0.2019
+   gain:attr_trading_activity                 0.0205                   0.1422       0.0143         0.1179          0.0221            0.1598            0.0123              0.1343
+                 gain:mem_log                 0.0182                    0.137        0.009         0.1072          0.0179            0.1284            0.0128              0.1225
+             gain:mem_reflect                 0.0298                   0.2905       0.0153         0.1146          0.0282            0.2878            0.0147              0.1187
+
+TABLE 7. Robustness: Holm-significant d_k and joint tests by model and clustering
+model     clustering min_clusters   df converged d_k significant (Holm) RQ1 joint p (all d_k = 0) RQ3 memory p (f_log = f_reflect = 0)
+  LPM path × profile           20   19      True                      7                       0.0                               0.0001
+logit path × profile           20   19      True                      7                       0.0                                  0.0
+  LPM           path           20   19      True                      8                       0.0                                  0.0
+logit           path           20   19      True                      7                       0.0                                  0.0
+  LPM        profile           40   39      True                      7                       0.0                                  0.0
+logit        profile           40   39      True                      7                       0.0                                  0.0
+  LPM      agent run         2032 2031      True                      9                       0.0                                  0.0
+logit      agent run         2032 2031      True                      7                       0.0                                  0.0

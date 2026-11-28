@@ -63,3 +63,58 @@ CAUTION: with this few profiles attributes that are on together cannot be separa
 Trading activity (active)     -0.0463  -0.216  0.0473
                log - none      0.1063  0.0471  0.1863
            reflect - none     -0.0971 -0.2168  0.0293
+
+TABLE 3. Logit (same regressors), odds ratios; SEs two-way clustered by path and profile
+            term     coef      se       p odds_ratio   or_lo    or_hi
+           const  -2.1904  0.4964  0.0116     0.1119  0.0282   0.4439
+            gain   1.1832  0.7158  0.1737     3.2648  0.4475  23.8189
+     profile_P01  -0.0708  0.2222  0.7658     0.9316  0.5028   1.7263
+     profile_P02   1.2963   0.178  0.0019     3.6557  2.2304   5.9918
+     profile_P03   0.4786   0.209  0.0839     1.6138  0.9033   2.8831
+     profile_P04   0.1509  0.1502   0.372     1.1628  0.7664   1.7644
+     profile_P05   0.7489  0.1306  0.0046     2.1147  1.4715    3.039
+     profile_P06    0.304  0.1323  0.0832     1.3552  0.9386   1.9568
+     profile_P07    0.649  0.1593  0.0152     1.9136  1.2298   2.9778
+         mem_log  -0.5922  0.3131  0.1315     0.5531  0.2319   1.3193
+    gain:mem_log   0.7831  0.2489  0.0346     2.1883  1.0964   4.3673
+     mem_reflect   0.1827  0.1974  0.4069     1.2005   0.694   2.0766
+gain:mem_reflect  -0.5607  0.2949    0.13     0.5708  0.2517   1.2945
+             ret   1.8992  0.9161  0.1068     6.6807  0.5251   85.003
+  holding_period  -0.0135  0.0472  0.7886     0.9866  0.8653   1.1248
+        drawdown -10.5015  3.2474  0.0319        0.0     0.0   0.2265
+
+TABLE 4. Effect on DE = average change in P(sell|gain) − P(sell|loss) when the variable goes 0 → 1 (memory: arm vs none). LPM: equals d_k / f_m. Logit: average marginal interaction effect. Delta-method SEs, path × profile.
+   variable LPM_estimate logit_estimate  LPM_se logit_se   LPM_p logit_p
+    mem_log       0.0906         0.1223  0.0444   0.0385  0.1112  0.0337
+mem_reflect      -0.1138        -0.1125  0.0588   0.0611  0.1251  0.1396
+
+TABLE 5. Average marginal effects on P(sell) (binary: 0 → 1; controls: dP/dx), path × profile
+model       variable estimate      se       p   ci_lo   ci_hi
+  LPM           gain   0.2481  0.1239  0.1157 -0.0958   0.592
+  LPM        mem_log  -0.0021  0.0274  0.9417 -0.0783  0.0741
+  LPM    mem_reflect  -0.0294  0.0252  0.3075 -0.0994  0.0405
+  LPM            ret   0.3426  0.1279  0.0553 -0.0125  0.6977
+  LPM holding_period  -0.0008  0.0078  0.9238 -0.0226   0.021
+  LPM       drawdown   -1.844  0.3999  0.0099 -2.9543 -0.7338
+logit           gain   0.2486  0.1136  0.0939 -0.0668  0.5641
+logit        mem_log   -0.007  0.0291  0.8212 -0.0877  0.0737
+logit    mem_reflect  -0.0335  0.0246  0.2439 -0.1017  0.0347
+logit            ret   0.3324  0.1374  0.0728  -0.049  0.7138
+logit holding_period  -0.0024  0.0081  0.7834 -0.0247    0.02
+logit       drawdown   -1.838  0.3747   0.008 -2.8784 -0.7976
+
+TABLE 6. Standard errors of the DE terms under each clustering (agent run = one persona × memory arm × path)
+            term LPM se, path × profile logit se, path × profile LPM se, path logit se, path LPM se, profile logit se, profile LPM se, agent run logit se, agent run
+    gain:mem_log                 0.0444                   0.2489       0.0219          0.285          0.0601            0.2852            0.0801              0.5552
+gain:mem_reflect                 0.0588                   0.2949       0.0606         0.2952          0.0409            0.2305            0.0964              0.5406
+
+TABLE 7. Robustness: Holm-significant d_k and joint tests by model and clustering
+model     clustering min_clusters  df converged d_k significant (Holm) RQ3 memory p (f_log = f_reflect = 0)
+  LPM path × profile            5   4      True                                                      0.1744
+logit path × profile            5   4      True                                                      0.0403
+  LPM           path            5   4      True                                                      0.0112
+logit           path            5   4      True                                                      0.0075
+  LPM        profile            8   7      True                                                       0.069
+logit        profile            8   7      True                                                      0.0368
+  LPM      agent run          114 113      True                                                      0.1003
+logit      agent run          114 113      True                                                      0.0932

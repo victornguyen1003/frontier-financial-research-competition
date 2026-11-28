@@ -172,6 +172,13 @@ Found while building the prototype (2026-11-27), before any pilot was run.
 
 - **Monthly returns** sum TEJ's adjusted daily log returns instead of using raw month-end
   closes, so ex-dividend drops do not count as losses.
+- **Robustness models added (2026-11-28).** These go beyond the plan, and the plan's LPM tests
+  are unchanged. The §5.2 regressors are also fitted as a logit, reported as odds ratios.
+  Average marginal effects are computed for both models, including the effect on
+  P(sell | gain) − P(sell | loss), with delta-method SEs. Every model is re-estimated with SEs
+  clustered by path, by profile and by agent run, as well as path × profile. Outputs:
+  `regression_models.csv`, `marginal_effects.csv`, `robustness.csv` and tables 3–7 of
+  `regression.txt`.
 - **Degrees of freedom** are fitted by matching simulated kurtosis, not by MLE. With 9 months
   per stock, the MLE on per-stock standardized returns gives df → ∞.
 - **The pilot cannot estimate attribute effects.** With 8 profiles, 11 attributes plus a
@@ -225,6 +232,19 @@ Found while building the prototype (2026-11-27), before any pilot was run.
 - **Main run.** Following the plan's rule (largest affordable design on the pre-specified
   grid), it uses P = 40, S = 20: 2,520 runs, about $6.0.
 
+**Main run (Luna, 2026-11-28)**
+
+- **Cost.** It cost $4.68, below the $6.0 projection, so prototype 2 has spent $6.04 of the
+  $10 cap. All 2,520 runs completed with no invalid replies or fallbacks, and one order was
+  rejected.
+- **Duplicate profile.** P37 and P39 have the same attribute vector. Profiles are drawn
+  independently from 2,048 combinations, and with 40 draws the chance of at least one
+  repeat is about 32%. The two profiles share prompts, and through the cache also replies,
+  so P39's 60 runs are copies of P37's, not independent data. The main run therefore has 39
+  distinct profiles. The analysis treats them as 40 clusters, which slightly understates
+  standard errors. A fix would be to draw without replacement and then run one new profile
+  (about $0.12).
+
 **Budget and models**
 
 - **Sol pilot does not fit its limit.** `gpt-6.2-sol` (the ID in the OpenAI project) reportedly
@@ -256,7 +276,8 @@ Found while building the prototype (2026-11-27), before any pilot was run.
   - other model versions.
 - **Robustness of the analysis.** These need no new runs:
 
-  - logit instead of LPM;
+  - logit instead of LPM (done 2026-11-28, with odds ratios, marginal effects and other
+    clusterings; see "Method changes from the plan");
   - without `ret`;
   - excluding the final period;
   - clustering by matched set (profile × path);
@@ -276,12 +297,16 @@ Found while building the prototype (2026-11-27), before any pilot was run.
 
 ## References
 
+- Ai, C., & Norton, E. C. (2003). Interaction terms in logit and probit models. *Economics
+  Letters*, 80(1), 123–129.
 - Barber, B. M., Lee, Y.-T., Liu, Y.-J., & Odean, T. (2007). Is the aggregate investor reluctant
   to realise losses? Evidence from Taiwan. *European Financial Management*, 13(3), 423–447.
 - Barber, B. M., & Odean, T. (2000). Trading is hazardous to your wealth: The common stock
   investment performance of individual investors. *Journal of Finance*, 55(2), 773–806.
 - Barberis, N., & Xiong, W. (2012). Realization utility. *Journal of Financial Economics*,
   104(2), 251–271.
+- Cameron, A. C., Gelbach, J. B., & Miller, D. L. (2011). Robust inference with multiway
+  clustering. *Journal of Business & Economic Statistics*, 29(2), 238–249.
 - Dhar, R., & Zhu, N. (2006). Up close and personal: Investor sophistication and the disposition
   effect. *Management Science*, 52(5), 726–740.
 - Feng, L., & Seasholes, M. S. (2005). Do investor sophistication and trading experience

@@ -1,0 +1,9 @@
+model,clustering,min_clusters,df,converged,d_k significant (Holm),RQ3 memory p (f_log = f_reflect = 0)
+LPM,path × profile,5,4,True,,0.1743844095361224
+logit,path × profile,5,4,True,,0.04030794174605469
+LPM,path,5,4,True,,0.011188468147952426
+logit,path,5,4,True,,0.007520788235907659
+LPM,profile,8,7,True,,0.0690194780168379
+logit,profile,8,7,True,,0.03680654672556224
+LPM,agent run,114,113,True,,0.10028797417665579
+logit,agent run,114,113,True,,0.09323535116073037

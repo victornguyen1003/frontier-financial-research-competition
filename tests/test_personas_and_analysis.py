@@ -220,3 +220,84 @@ def test_stage_limit_stops_before_the_overall_cap(tmp_path):
     with pytest.raises(BudgetExceeded, match="stage limit"):
         c.reserve(0.3)
     assert c.summary()["stage_limit_usd"] == 0.5
+
+
+def test_viewer_charts_build_and_drop_undefined_ratios():
+    import pandas as pd
+    from llm_investors.app import charts as CH
+    rows = []
+    for p, plr in (("C0", 0.2), ("P00", 0.1), ("P01", 0.0)):
+        for a in CH.ARCHS + ["all arms"]:
+            rows.append({"persona": p, "architecture": a, "runs": 5, "PGR": 0.5, "PLR": plr,
+                         "DE": 0.5 - plr, "DE_lo": 0.4 - plr, "DE_hi": 0.6 - plr,
+                         "Ratio": 0.5 / plr if plr else float("nan"), "Ratio_lo": 0.0,
+                         "Ratio_hi": 9.0, "PGR_lo": 0.4, "PGR_hi": 0.6, "PLR_lo": 0.0,
+                         "PLR_hi": 0.3})
+    cells = pd.DataFrame(rows)
+    assert CH.rank_by(cells)[0] == "P01"
+    ch, dropped = CH.cells_chart(cells, ["C0", "P00", "P01"], ["all arms"], "Ratio")
+    assert ch is not None and dropped == ["P01 (all arms)"]
+    assert CH.cells_chart(cells, ["C0"], CH.ARCHS, "DE")[0].to_dict()
+    assert CH.memory_chart(cells, ["C0", "P00"], change=True, background=True).to_dict()
+    assert CH.persona_order(["P01", "C1", "C0"]) == ["C0", "C1", "P01"]
+
+
+def _toy_decisions(seed=0, n_paths=8, n_prof=12, n=4000):
+    import pandas as pd
+    rng = np.random.default_rng(seed)
+    d = pd.DataFrame({"scenario": rng.integers(0, n_paths, n),
+                      "persona": [f"P{i:02d}" for i in rng.integers(0, n_prof, n)],
+                      "gain": rng.integers(0, 2, n), "a": rng.integers(0, 2, n).astype(float),
+                      "x": rng.normal(size=n)})
+    d["run_id"] = d["persona"] + "_" + d["scenario"].astype(str)
+    eta = -1 + 0.8 * d["gain"] + 0.3 * d["a"] + 0.9 * d["gain"] * d["a"] + 0.5 * d["x"]
+    d["sold"] = (rng.random(n) < 1 / (1 + np.exp(-eta))).astype(int)
+    return d
+
+
+def _toy_builder(dd):
+    g, a = dd["gain"].to_numpy(float), dd["a"].to_numpy(float)
+    return np.column_stack([np.ones(len(dd)), g, a, g * a, dd["x"].to_numpy(float)])
+
+
+def test_logit_matches_statsmodels_with_clustered_se():
+    import pandas as pd
+    import statsmodels.api as sm
+    from llm_investors.analysis import models as M
+    d = _toy_decisions()
+    X = _toy_builder(d)
+    f, ok = M.logit(d["sold"].to_numpy(float), X, list("cgaix"), [d["persona"].to_numpy()])
+    r = sm.Logit(d["sold"].to_numpy(float), X).fit(
+        disp=0, cov_type="cluster", cov_kwds={"groups": pd.factorize(d["persona"])[0],
+                                              "use_correction": False})
+    G = d["persona"].nunique()
+    assert ok and np.allclose(f.beta, r.params, atol=1e-8)
+    # statsmodels without correction = plain sandwich; ours adds G/(G-1) as Stata does
+    assert np.allclose(f.se, np.sqrt(np.diag(r.cov_params()) * G / (G - 1)), rtol=1e-6)
+
+
+def test_marginal_effects_lpm_equals_coefficients_and_logit_is_sane():
+    from llm_investors.analysis import models as M
+    d = _toy_decisions(1)
+    X = _toy_builder(d)
+    names = ["const", "gain", "attr_a", "gain:attr_a", "x"]
+    fits = M.fit_all(d, X, names)
+    me = M.marginal_effects(fits, d, lambda dd: _toy_builder(
+        dd.rename(columns={"attr_a": "a"}) if "attr_a" in dd else dd),
+        [], [], [])
+    assert set(me["clustering"]) == set(M.CLUSTERINGS)
+    lpm = fits[0].fit
+    g = me[(me["model"] == "LPM") & (me["variable"] == "gain")].iloc[0]
+    # LPM AME of gain = b_gain + b_gain:a * mean(a)
+    assert np.isclose(g["estimate"], lpm.beta[1] + lpm.beta[3] * d["a"].mean(), atol=1e-6)
+    # effect on DE of a binary variable, via the attr path of _effects
+    d2 = d.rename(columns={"a": "attr_a"})
+    b2 = lambda dd: _toy_builder(dd.rename(columns={"attr_a": "a"}))  # noqa: E731
+    me2 = M.marginal_effects(fits[:2], d2, b2, ["attr_a"], [], ["x"])
+    de = me2[(me2["effect"] == "effect on DE") & (me2["model"] == "LPM")].iloc[0]
+    assert np.isclose(de["estimate"], lpm.beta[3], atol=1e-6)
+    assert np.isclose(de["se"], lpm.se[3], rtol=1e-4)
+    lg = me2[(me2["effect"] == "effect on DE") & (me2["model"] == "logit")].iloc[0]
+    assert 0.05 < lg["estimate"] < 0.35 and lg["se"] > 0
+    xx = me2[(me2["variable"] == "x") & (me2["model"] == "LPM")].iloc[0]
+    assert np.isclose(xx["estimate"], lpm.beta[4], rtol=1e-4)

@@ -51,8 +51,8 @@ and paid `tag-reasoning` then post a summary when they finish or stop. The topic
 | 4 | `run-study1 --stage pilot --model gpt-6.2-sol` | see "Budget" | second pilot |
 | 5 | `analyze-study1 <pilot>` and `power-study1 <pilot>` | free | §5 analysis; power curves, MDE and the recommended (P, S) |
 | 6 | set `stages.full.{profiles, scenarios}` and `llm.model`, then `run-study1 --stage full` | ≤ $6.5 | main run → `study1_v3_<model>` |
-| 7 | `tag-reasoning <dataset>` | ≤ $0.5 | `reasoning_tags.csv` and a 100-text hand-coding sample |
-| 8 | `analyze-study1 <dataset>` | free | `results/<dataset>/analysis/` |
+| 7 | `tag-reasoning <dataset>` | ≤ $0.5 | `reasoning_tags.csv` and a 100-text hand-coding sample (skipped for prototype 2) |
+| 8 | `analyze-study1 <dataset>` | free | `results/<dataset>/analysis/`: LPM (plan §5.2) plus logit odds ratios, marginal effects and SEs under four clusterings |
 
 Every paid stage first projects its cost from its exact prompts (no API call), refuses to start
 if the typical projection exceeds its stage limit (shrink with `--scenarios N`), and asks for
@@ -67,7 +67,9 @@ free steps.
 
 **Viewer:** `investor-viewer` (or `streamlit run src/llm_investors/app/streamlit_app.py`). Pages:
 research goal and setup, agent prompts (prompt builder), live view (refreshes every 2 s),
-final dataset (filters, downloads), data analysis. It reads files only and never calls the API.
+final dataset (filters, downloads), data analysis (interactive charts; a sidebar picks which
+personas they show), findings and conclusions (renders `docs/prototype-2-findings.md`). It reads
+files only and never calls the API.
 
 ## Budget
 

@@ -25,6 +25,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # src/, if not pip-installed
 from llm_investors.agents import personas as PZ  # noqa: E402
 from llm_investors.agents import prompts as PR  # noqa: E402
+from llm_investors.app import charts as CH  # noqa: E402
 from llm_investors.paths import ROOT  # noqa: E402
 
 st.set_page_config(page_title="LLM investor personas", layout="wide")
@@ -146,7 +147,7 @@ name = st.sidebar.selectbox("Dataset", all_ds or ["(none yet)"],
                             help="study1_v3_<model>_pilot = pilot; *_dummy = rule-based agents "
                                  "(pipeline check, not findings)")
 page = st.sidebar.radio("Page", ["Research goal and setup", "Agent prompts", "Live view",
-                                 "Final dataset", "Data analysis"])
+                                 "Final dataset", "Data analysis", "Findings and conclusions"])
 sp = spend()
 st.sidebar.metric("Spent (prototype 2)", f"${max(sp['ledger'], sp['cache']):.4f}",
                   help=f"Hard cap ${C['budget']['cap_usd']:.2f}")
@@ -579,6 +580,50 @@ elif page == "Data analysis":
     figs = an / "figures"
     st.caption(f"{t['n_runs']} complete runs, {t['n_decision_rows']:,} sale-day position rows. "
                f"Regression: {t.get('regression_model')}")
+    cells = table(name, "analysis/cells")
+    runs = table(name, "runs")
+    shown: list[str] = []
+    if cells is not None and not cells.empty:
+        present = set(cells["persona"])
+        refs = [p for p in CH.CONTROLS if p in present]
+        profs = sorted(p for p in present if p not in CH.CONTROLS)
+        ranked = [p for p in CH.rank_by(cells) if p in profs]
+        with st.sidebar:
+            st.divider()
+            st.markdown("**Personas in the charts**")
+            st.caption("Used by the persona, ratio and memory charts below.")
+            mode = st.radio("Profiles", ["None (reference rows only)", "Highest and lowest DE",
+                                         "By attribute", "Choose"], index=1, key="pp_mode")
+            chosen: list[str] = []
+            if profs and mode == "Highest and lowest DE":
+                half = max(1, len(ranked) // 2)
+                n = st.slider("How many at each end", 1, half, min(5, half), key="pp_n")
+                chosen = list(dict.fromkeys(ranked[:n] + ranked[-n:]))
+            elif profs and mode == "By attribute":
+                keys = [k for k in PZ.ATTRIBUTE_KEYS
+                        if runs is not None and f"attr_{k}" in runs]
+                if keys:
+                    k = st.selectbox("Attribute", keys, format_func=lambda x: PZ.LABELS[x],
+                                     key="pp_attr")
+                    lvl = st.radio("Level", [1, 0], horizontal=True, key="pp_lvl",
+                                   format_func=lambda v: f"level {v}")
+                    att = runs.drop_duplicates("persona").set_index("persona")[f"attr_{k}"]
+                    chosen = [p for p in profs if att.get(p) == lvl]
+                    st.caption(f"{len(chosen)} profiles at level {lvl}.")
+                else:
+                    st.caption("No attribute columns in this dataset.")
+            elif profs and mode == "Choose":
+                chosen = st.multiselect("Profiles", profs, default=ranked[:3], key="pp_pick")
+            ref_pick = st.multiselect("Reference rows", refs, default=refs, key="pp_refs",
+                                      help="C0: no persona. C1: persona that states the "
+                                           "mechanism. Pooled: all sampled profiles together.")
+            sort = st.radio("Order profiles by", ["DE, all arms (high to low)", "Name"],
+                            key="pp_sort")
+            if sort == "Name":
+                chosen = sorted(chosen)
+            else:
+                chosen = [p for p in ranked if p in set(chosen)]
+            shown = [p for p in refs if p in ref_pick] + chosen
 
     st.header("Tests")
     rows = []
@@ -611,19 +656,72 @@ elif page == "Data analysis":
                "is inconclusive, not evidence of no effect.")
 
     st.header("Cells (§5.1)")
-    image(figs / "de_by_persona_arm.png",
-          "Bars above zero: the persona sells winners more readily than losers in that arm.")
-    image(figs / "ratio_vs_benchmark.png",
-          "Points above the 'Individuals 2.63' line show a stronger winner/loser asymmetry than "
-          "Taiwanese individuals in Barber et al.; compare ratios and signs, not levels.")
-    show(table(name, "analysis/cells"))
+    if cells is None or cells.empty:
+        st.caption("Cells table not available yet.")
+    elif not shown:
+        st.caption("Choose personas in the sidebar.")
+    else:
+        c1, c2 = st.columns([1, 2])
+        metric = c1.selectbox("Measure", list(CH.METRICS), key="cell_metric",
+                              format_func=lambda m: CH.METRICS[m])
+        arm_opts = ARCHS + ["all arms"]
+        arms = c2.multiselect("Memory arms", arm_opts, default=ARCHS, key="cell_arms")
+        bm = None
+        if metric == "Ratio":
+            bmall = pd.read_csv(ROOT / "data" / "benchmarks" / "barber_2007_table3_panelB.csv")
+            which = st.multiselect("Benchmarks: Barber et al. (2007), Table 3 Panel B",
+                                   list(bmall["investor_type"]),
+                                   default=["Individuals", "Mutual funds"], key="cell_bm")
+            bm = bmall[bmall["investor_type"].isin(which)]
+        if not arms:
+            st.caption("Choose at least one memory arm.")
+        else:
+            ch, dropped = CH.cells_chart(cells, shown, arms, metric, bm)
+            if ch is not None:
+                st.altair_chart(ch, width="stretch")
+            if dropped:
+                st.caption("Not drawn (ratio undefined because PLR = 0, i.e. no loser was "
+                           "ever sold): " + ", ".join(dropped))
+            cap = {"DE": "Bars right of zero: the persona sells winners more readily than "
+                         "losers in that arm.",
+                   "PGR": "Share of paper gains realized on sale days.",
+                   "PLR": "Share of paper losses realized on sale days.",
+                   "Ratio": "Points right of the 'Individuals 2.63' line show a stronger "
+                            "winner/loser asymmetry than Taiwanese individuals in Barber et al.; "
+                            "compare ratios and signs, not levels. Lower CI ends at or below 0 "
+                            f"are drawn at {CH.RATIO_FLOOR}."}[metric]
+            st.caption(cap + " Lines: 95% path-bootstrap CI. Hover for PGR, PLR and run counts.")
+        with st.expander("Table for the personas and arms shown"):
+            show(cells[cells["persona"].isin(shown) & cells["architecture"].isin(arms or ARCHS)]
+                 .drop(columns=[c for c in ("kind",) if c in cells]))
+        with st.expander("Full cells table"):
+            show(cells)
 
     st.header("Attribute effects (§5.2, RQ2)")
-    image(figs / "forest_attributes.png",
-          "An attribute whose CI lies inside the grey ±0.03 band is a blind spot: the model "
-          "does not respond to it. CIs crossing the dotted MDE lines are inconclusive.")
     bs = table(name, "analysis/blind_spots")
-    show(bs, "Needs the main run: the pilot's 8 profiles cannot identify 11 attribute effects.")
+    if bs is not None and not bs.empty and bs["coef"].notna().any():
+        bsv = bs.dropna(subset=["coef"])
+        c1, c2 = st.columns([2, 1])
+        att_pick = c1.multiselect("Attributes", list(bsv["label"]), default=list(bsv["label"]),
+                                  key="forest_attrs")
+        forder = c2.radio("Order", ["Effect (high to low)", "Catalog"], horizontal=True,
+                          key="forest_order")
+        fb = bsv[bsv["label"].isin(att_pick)]
+        if fb.empty:
+            st.caption("Choose at least one attribute.")
+        else:
+            fo = (list(fb.sort_values("coef", ascending=False)["label"])
+                  if forder.startswith("Effect") else list(fb["label"]))
+            band = float(t.get("blind_spot_band", 0.03))
+            st.altair_chart(CH.forest_chart(fb, band, fo), width="stretch")
+            st.caption(f"An attribute whose CI lies inside the grey ±{band} band is a blind "
+                       "spot: the model does not respond to it. CIs crossing the dotted lines "
+                       "(mean Holm MDE) are inconclusive. Hover for p-values.")
+        with st.expander("Table"):
+            show(bs)
+    else:
+        show(bs, "Needs the main run: the pilot's 8 profiles cannot identify 11 attribute "
+                 "effects.")
     rq2 = t.get("rq2") or {}
     if rq2:
         st.markdown(f"**Significant (Holm):** {', '.join(rq2['significant']) or 'none'} · "
@@ -637,10 +735,50 @@ elif page == "Data analysis":
                    "barely changes decisions.")
     st.subheader("Regression (§5.2): every term")
     reg = table(name, "analysis/regression")
+    rm = table(name, "analysis/regression_models")
+    me = table(name, "analysis/marginal_effects")
+    rob = table(name, "analysis/robustness")
+    CLUST_HELP = ("path × profile: two-way, the plan's choice (decisions share a price path and "
+                  "a persona). path: one-way by price path. profile: one-way by persona, i.e. "
+                  "the investor. agent run: one persona × memory arm × path, the unit that "
+                  "trades; ignores correlation across paths and arms, so SEs are the smallest.")
+    clusts = (list(dict.fromkeys(rm["clustering"])) if rm is not None and not rm.empty
+              else ["path × profile"])
     if reg is not None and not reg.empty:
+        if "status" not in reg:  # tables written before omitted terms were listed
+            reg = reg.assign(status="estimated")
         st.caption(t.get("regression_model", ""))
-        est = reg[reg["status"] == "estimated"].drop(columns="status")
-        st.dataframe(est.round(4), hide_index=True)
+        c1, c2 = st.columns(2)
+        model = c1.radio("Model", ["LPM", "logit"], horizontal=True, key="reg_model",
+                         format_func=lambda m: {"LPM": "Linear probability (plan §5.2)",
+                                                "logit": "Logit (odds ratios)"}[m])
+        clu = c2.selectbox("Cluster standard errors by", clusts, key="reg_clu",
+                           help=CLUST_HELP)
+        if rm is not None and not rm.empty:
+            r = rm[(rm["model"] == model) & (rm["clustering"] == clu)]
+            if not bool(r["converged"].all()):
+                st.warning("The logit did not converge (likely separation): read with care.")
+            cols = ["term", "coef", "se", "p", "ci_lo", "ci_hi"]
+            if model == "logit":
+                cols += ["odds_ratio", "or_lo", "or_hi"]
+            cols += ["p_holm_dk"]
+            st.dataframe(r[cols].round(4).rename(columns={
+                "p_holm_dk": "p (Holm, d_k family)", "or_lo": "OR 95% low",
+                "or_hi": "OR 95% high", "odds_ratio": "odds ratio"}), hide_index=True)
+            st.caption(
+                (f"{int(r['n_clusters_min'].iloc[0])} clusters in the smallest dimension; "
+                 f"t with {int(r['n_clusters_min'].iloc[0]) - 1} df. ")
+                + ("Coefficients are changes in P(sell). gain:attr_k (d_k) is the change in "
+                   "P(sell | gain) − P(sell | loss), the regression counterpart of PGR − PLR."
+                   if model == "LPM" else
+                   "Coefficients are log-odds; odds ratio = exp(coef). For gain:attr_k, the "
+                   "odds ratio is the factor by which attr_k multiplies the odds ratio of "
+                   "selling a gain rather than a loss (> 1: stronger DE). Odds ratios are "
+                   "not probabilities: see the marginal effects below."))
+        else:
+            est = reg[reg["status"] == "estimated"].drop(columns="status")
+            st.dataframe(est.round(4), hide_index=True)
+            st.caption(f"Logit and other clusterings: re-run analyze-study1 {name}.")
         left = reg[reg["status"] != "estimated"][["term", "status"]]
         if not left.empty:
             st.markdown(f"**Not in the fitted model ({len(left)} terms)**")
@@ -648,6 +786,81 @@ elif page == "Data analysis":
                          hide_index=True)
     else:
         st.caption("Regression not estimable for this dataset (e.g. C0/C1 only).")
+
+    def var_label(v: str) -> str:
+        if v.startswith("attr_"):
+            return PZ.LABELS.get(v[5:], v)
+        return {"gain": "Gain (vs loss)", "mem_log": "Memory: log vs none",
+                "mem_reflect": "Memory: reflect vs none", "ret": "Return this month",
+                "holding_period": "Holding period", "drawdown": "Drawdown"}.get(v, v)
+
+    if me is not None and not me.empty:
+        st.subheader("Marginal effects")
+        c1, c2 = st.columns([3, 2])
+        kind = c1.radio("Effect", ["effect on DE", "AME on P(sell)"], horizontal=True,
+                        key="me_kind", format_func=lambda k: {
+                            "effect on DE": "On the DE: P(sell|gain) − P(sell|loss)",
+                            "AME on P(sell)": "On P(sell)"}[k])
+        me_clu = c2.selectbox("Cluster standard errors by", clusts, key="me_clu",
+                              help=CLUST_HELP)
+        e = me[(me["effect"] == kind) & (me["clustering"] == me_clu)].assign(
+            label=lambda x: x["variable"].map(var_label))
+        vlabels = list(dict.fromkeys(e["label"]))
+        default = [v for v in vlabels if v not in ("Drawdown", "Return this month",
+                                                   "Holding period")]
+        vp = st.multiselect("Variables", vlabels, default=default, key="me_vars")
+        e = e[e["label"].isin(vp)]
+        if not e.empty:
+            lpm_order = list(e[e["model"] == "LPM"].sort_values("estimate", ascending=False)
+                             ["label"])
+            xt = ("change in P(sell | gain) − P(sell | loss)" if kind == "effect on DE"
+                  else "change in P(sell)")
+            st.altair_chart(CH.estimates_chart(e, "model", lpm_order, xt,
+                                               sorted(e["model"].unique())), width="stretch")
+            wide = e.pivot(index="label", columns="model",
+                           values=["estimate", "se", "p"] + (["p_holm_attr"]
+                                                             if kind == "effect on DE" else []))
+            wide.columns = [f"{m} {v}".replace("p_holm_attr", "p Holm") for v, m in wide.columns]
+            st.dataframe(wide.reindex(lpm_order).round(4), width="stretch")
+        st.caption(
+            "Average over the estimation sample of counterfactual predictions, with "
+            "delta-method SEs. Binary variables: 0 → 1 (memory: arm vs none); controls: dP/dx. "
+            "'On the DE' is the average change in P(sell | gain) − P(sell | loss): in the LPM it "
+            "equals d_k exactly; in the logit it is the marginal interaction effect on the "
+            "probability scale (Ai & Norton 2003), which the log-odds coefficient is not. "
+            "Holm adjusts across the 11 attributes.")
+
+    if rob is not None and not rob.empty:
+        st.subheader("Robustness to model and clustering")
+        st.dataframe(rob.round(4), hide_index=True)
+        if me is not None and not me.empty:
+            de = me[(me["effect"] == "effect on DE") & me["variable"].str.startswith("attr_")]
+            n_combo = de.groupby(["model", "clustering"]).ngroups
+            sig = (de.assign(sig=de["p_holm_attr"] < 0.05)
+                   .groupby("variable")["sig"].sum().astype(int)
+                   .rename(f"Holm-significant in N of {n_combo} model × clustering")
+                   .reset_index().assign(attribute=lambda x: x["variable"].map(var_label)))
+            sig = sig.sort_values(sig.columns[1], ascending=False)
+            st.markdown("**How often each attribute's effect on the DE survives Holm**")
+            st.dataframe(sig[["attribute", sig.columns[1]]], hide_index=True)
+            c1, c2 = st.columns([1, 3])
+            rmodel = c1.radio("Model", ["LPM", "logit"], horizontal=True, key="rob_model")
+            rvars = c2.multiselect("Attributes", list(dict.fromkeys(de["variable"]
+                                                                    .map(var_label))),
+                                   default=[], key="rob_vars",
+                                   help="Empty = all attributes")
+            dd = de[de["model"] == rmodel].assign(label=lambda x: x["variable"].map(var_label))
+            if rvars:
+                dd = dd[dd["label"].isin(rvars)]
+            order = list(dd[dd["clustering"] == clusts[0]]
+                         .sort_values("estimate", ascending=False)["label"])
+            st.altair_chart(CH.estimates_chart(dd, "clustering", order,
+                                               "effect on P(sell | gain) − P(sell | loss)",
+                                               clusts), width="stretch")
+            st.caption("Same point estimate under every clustering; only the 95% CI changes. "
+                       "Agent-run clustering ignores that a persona's runs share a persona "
+                       "and a path, so its narrow CIs are optimistic; the plan's choice is "
+                       "path × profile.")
 
     st.subheader("Raw DE difference")
     raw = table(name, "analysis/attribute_de")
@@ -684,8 +897,10 @@ elif page == "Data analysis":
                 y=alt.Y("DE:Q", title="DE = PGR − PLR"))
             err = base.mark_rule(color="#52514e").encode(y="DE_lo:Q", y2="DE_hi:Q")
             zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="#52514e").encode(y="y:Q")
-            chart = (bars + err + zero).properties(width=170, height=260).facet(
-                column=alt.Column("label:N", title=None, header=alt.Header(labelFontSize=12)))
+            chart = (bars + err + zero).properties(width=170, height=240).facet(
+                facet=alt.Facet("label:N", title=None, header=alt.Header(labelFontSize=12),
+                                sort=[labels[v] for v in pick]),
+                columns=4)
             st.altair_chart(chart.resolve_scale(x="independent"))
             st.caption("Pooled PGR − PLR at each level with 95% path-bootstrap intervals "
                        "(hover for PGR, PLR and run counts). Attributes and memory use the "
@@ -697,8 +912,20 @@ elif page == "Data analysis":
         st.code(p.read_text() if p.exists() else "", language=None)
 
     st.header("Memory (RQ3)")
-    image(figs / "memory_effects.png",
-          "Lines that slope away from 'none' show the record or the lessons changing the DE.")
+    if cells is not None and not cells.empty and shown:
+        c1, c2 = st.columns(2)
+        change = c1.radio("Plot", ["DE level", "Change vs no memory"], horizontal=True,
+                          key="mem_y") == "Change vs no memory"
+        bg = c2.checkbox("Show the other profiles faintly", value=False, key="mem_bg")
+        mc_chart = CH.memory_chart(cells, shown, change=change, background=bg)
+        if mc_chart is not None:
+            st.altair_chart(mc_chart, width="stretch")
+            st.caption("Personas from the sidebar. Lines that slope away from 'none' show the "
+                       "record (log) or the lessons (reflect) changing the DE. Hover a line or "
+                       "legend entry to highlight it.")
+    else:
+        image(figs / "memory_effects.png",
+              "Lines that slope away from 'none' show the record or the lessons changing the DE.")
     tg = t.get("rq3_tags")
     if tg:
         image(figs / "tag_rates.png",
@@ -720,6 +947,48 @@ elif page == "Data analysis":
         st.dataframe(pd.DataFrame(agr).T.round(3))
 
     st.header("Example path")
-    image(figs / "example_path.png", "Each arm's trades on the same prices.")
+    lf = {run_label(p): p for p in log_files(name)}
+    if runs is not None and not runs.empty and lf:
+        c1, c2, c3 = st.columns(3)
+        scen = sorted(int(s) for s in runs["scenario"].unique())
+        k = c1.selectbox("Path", scen, key="ex_path")
+        pers = CH.persona_order(runs["persona"].unique())
+        ex_p = c2.selectbox("Persona", pers, index=pers.index("C1") if "C1" in pers else 0,
+                            key="ex_persona")
+        ex_arms = c3.multiselect("Memory arms", ARCHS, default=ARCHS, key="ex_arms")
+        evs = {a: log_events(lf[f"{a}_{ex_p}_s{k:03d}"]) for a in ex_arms
+               if f"{a}_{ex_p}_s{k:03d}" in lf}
+        if not evs:
+            st.caption("No logs for this choice.")
+        else:
+            px, tr = CH.path_frames(evs)
+            stocks = list(px["stock"].unique())
+            ex_s = st.multiselect("Stocks", stocks, default=stocks, key="ex_stocks")
+            if ex_s:
+                st.altair_chart(CH.path_chart(px, tr, ex_s))
+            st.caption(f"Path {k}, {ex_p}: each arm's trades on the same prices (▼ sell, "
+                       "▲ buy; arms nudged apart vertically). Hover a trade for its quantity, "
+                       "average cost and that month's reasoning.")
+            start = next(e for e in next(iter(evs.values())) if e["type"] == "run_start")
+            with st.expander("Persona text"):
+                st.write(start.get("persona_text") or "(none)")
+    else:
+        image(figs / "example_path.png", "Each arm's trades on the same prices.")
     st.header("Power")
     image(figs / "power_curves.png", "Power of the planned tests by profiles P and paths S.")
+    with st.expander("Static figures (as saved by analyze-study1, for the paper)"):
+        for f in ("de_by_persona_arm", "ratio_vs_benchmark", "forest_attributes",
+                  "memory_effects", "example_path"):
+            image(figs / f"{f}.png", f)
+
+
+# =========================================================================== 6. findings
+elif page == "Findings and conclusions":
+    p = ROOT / "docs" / "prototype-2-findings.md"
+    if not p.exists():
+        st.info("No findings written yet (docs/prototype-2-findings.md).")
+    else:
+        st.caption("Written for the Luna main run (study1_v3_gpt-6-luna), whichever dataset is "
+                   "selected in the sidebar. Source: docs/prototype-2-findings.md. The "
+                   "Data analysis page has the interactive charts behind each number.")
+        st.markdown(p.read_text(encoding="utf-8"))
